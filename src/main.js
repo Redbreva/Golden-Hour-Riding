@@ -134,10 +134,11 @@ coursePanel.addEventListener('click', (e) => e.stopPropagation());
 const WEATHER_OPTIONS = [
   ...(winterMode ? [{ id: 'snow', name: 'Snow', subtitle: 'Winter dusk with gentle falling snow', key: 'Snow' }] : []),
   { id: 'golden', name: 'Golden Hour', subtitle: 'Low warm sun, long shadows & light shafts', key: '1' },
-  { id: 'overcast', name: 'Overcast', subtitle: 'Soft diffuse light under a grey cloud deck', key: '2' },
-  { id: 'rain', name: 'Rain', subtitle: 'Falling streaks, wet tarmac ripples & lens drops', key: '3' },
-  { id: 'mist', name: 'Mist', subtitle: 'Thick valley fog with soft sunlit rays', key: '4' },
-  { id: 'starry', name: 'Starry Night', subtitle: 'Swirling night sky with painterly brush filter', key: '5' },
+  { id: 'sunset', name: 'Deep Sunset', subtitle: 'Amber-rose dusk sky with long dramatic shadows', key: '2' },
+  { id: 'overcast', name: 'Overcast', subtitle: 'Soft diffuse light under a grey cloud deck', key: '3' },
+  { id: 'rain', name: 'Rain', subtitle: 'Falling streaks, wet tarmac ripples & lens drops', key: '4' },
+  { id: 'mist', name: 'Mist', subtitle: 'Thick valley fog with soft sunlit rays', key: '5' },
+  { id: 'starry', name: 'Starry Night', subtitle: 'Swirling night sky with painterly brush filter', key: '6' },
 ];
 const weatherBtn = $('btn-weather');
 const weatherPanel = $('weather-panel');
@@ -250,9 +251,24 @@ window.addEventListener('keydown', (e) => {
   if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
     toggleSound();
   }
-  const weatherKey = ['golden', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
+  if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    setHeadlight(!cockpit.isHeadlightOn());
+  }
+  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    const badge = $('fps-badge');
+    badge.hidden = !badge.hidden;
+  }
+  const weatherKey = ['golden', 'sunset', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
   if (weatherKey) weather.setWeather(weatherKey);
 });
+
+const lightBtn = $('btn-light');
+function setHeadlight(on) {
+  cockpit.setHeadlight(on);
+  lightBtn.textContent = on ? 'Light: ON' : 'Light: off';
+  lightBtn.classList.toggle('on', on);
+}
+lightBtn.addEventListener('click', () => setHeadlight(!cockpit.isHeadlightOn()));
 
 const soundBtn = $('btn-sound');
 function toggleSound() {
@@ -297,6 +313,7 @@ initVoiceControl({
     soundBtn.textContent = muted ? 'Sound: off' : 'Sound: on';
     soundBtn.classList.toggle('on', !muted);
   },
+  setHeadlight,
   adjustHills: (delta) => trainer.setHills(trainer.getHillsPercent() + delta),
   setHills: (pct) => trainer.setHills(pct),
   getHillsLabel: () => trainer.getHillsLabel(),
@@ -342,11 +359,25 @@ const sunNdc = new V3();
 const fwdDir = new V3();
 
 let hudTimer = 0;
+let fpsFrames = 0;
+let fpsElapsed = 0;
 let firstFrame = true;
 
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.05);
   uniforms.uTime.value += dt;
+  fpsFrames++;
+  fpsElapsed += dt;
+  if (fpsElapsed >= 0.5) {
+    const fps = Math.round(fpsFrames / fpsElapsed);
+    const badge = $('fps-badge');
+    if (badge && !badge.hidden) {
+      badge.textContent = `${fps} FPS`;
+      badge.style.color = fps >= 50 ? '#a8f5a8' : fps >= 30 ? '#ffd97d' : '#ff7a70';
+    }
+    fpsFrames = 0;
+    fpsElapsed = 0;
+  }
 
   stepRidePhysics(state, dt, course, pose, probe, sceneryMode);
 

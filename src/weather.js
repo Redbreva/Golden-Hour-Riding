@@ -229,6 +229,13 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
       dome: 0, domeH: hz, domeZ: hz, cloud: 1, cLit: warmLit, cDark: warmDark,
       mote: 1, rays: 1, rain: 0, snow: 0, rough: 1, tint: 1, ground: 1, paint: 0, expo: 0.33,
     },
+    sunset: {
+      sun: 6.5, sunCol: [1, 0.48, 0.26], hemi: 1.7, fog: 0.0012,
+      fogCol: [hz[0] * 1.02, hz[1] * 0.64, hz[2] * 0.48],
+      dome: 0.35, domeH: [hz[0] * 1.05, hz[1] * 0.62, hz[2] * 0.44], domeZ: grey(0.18, 0.16, 0.34),
+      cloud: 1, cLit: grey(2.4, 1.15, 0.62), cDark: grey(0.28, 0.24, 0.38),
+      mote: 1.4, rays: 1.25, rain: 0, snow: 0, rough: 0.85, tint: 0.92, ground: 0.88, paint: 0, expo: 0.36,
+    },
     overcast: {
       sun: 1.5, sunCol: [1, 1, 1], hemi: 7, fog: 0.0008, fogCol: grey(0.8, 0.83, 0.88),
       dome: 1, domeH: grey(0.8, 0.83, 0.88), domeZ: grey(0.5, 0.53, 0.6),
@@ -268,6 +275,7 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
 
   const WEATHER_LABELS = {
     golden: 'Golden',
+    sunset: 'Deep Sunset',
     overcast: 'Overcast',
     rain: 'Rain',
     mist: 'Mist',

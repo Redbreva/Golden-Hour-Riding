@@ -10,10 +10,10 @@ Inspired by [Jamie WP's Golden Hour Ride](https://golden-hour-ride.space.fast/) 
   - **Alpine Valley**: Procedurally generated mountain valley loop with pine forests, rolling meadows, moving clouds, and golden-hour sunlight.
   - **Alpine Valley — Christmas**: Snowy dusk edition with glowing timber chalets, fairy-lit pines, and falling snow.
   - **Leckhampton Hill**: Real-world Cotswold climb built from Environment Agency terrain elevation (DEM) and OpenStreetMap data, with broadleaf trees, sheep flocks, hay stooks, hedges, dry-stone walls, and quarry smoke.
-- **Weather System**: Smooth transitions between **Golden**, **Overcast**, **Rain** (rain streaks, wet tarmac ripples, lens raindrops, rain audio), **Mist**, **Starry Night**, and **Snow** (`1`–`5` keys or top-bar buttons).
-- **Cycling Physics & Cockpit**: First-person road bike handlebars with live head unit (`KM/H` & `WATTS`), power-to-speed physics (gravity, rolling resistance, aerodynamic drag), corner lean, pedal sway, and speed-sensitive FOV.
+- **Weather System**: Smooth transitions between **Golden**, **Deep Sunset**, **Overcast**, **Rain** (rain streaks, wet tarmac ripples, lens raindrops, rain audio), **Mist**, **Starry Night**, and **Snow** (`1`–`6` keys or **Weather ▾** dropdown).
+- **Cycling Physics & Cockpit**: First-person road bike handlebars with live head unit (`KM/H` & `WATTS`), toggleable bike headlight (`L` key or **Light** button), power-to-speed physics (gravity, rolling resistance, aerodynamic drag), corner lean, pedal sway, and speed-sensitive FOV.
 - **Bluetooth Smart Trainer Support (BLE)**: In-app Bluetooth trainer picker connecting to `Cycling Power` (0x1818) and `Fitness Machine Service / FTMS` (0x1826) trainers for live watts and gradient simulation, with `0%–100%` hill scaling.
-- **Native Offline Voice Control**: Uses macOS on-device `SFSpeechRecognizer` and Windows built-in `.NET System.Speech` — zero cloud API keys (`golden`, `overcast`, `rain`, `mist`, `starry`, `snow`, `skip`, `back`, `hide`, `show`, `easier`/`gear down`, `harder`/`gear up`, `flat`, `full`).
+- **Native Offline Voice Control**: Uses macOS on-device `SFSpeechRecognizer` and Windows built-in `.NET System.Speech` — zero cloud API keys (`golden`, `sunset`/`dusk`, `overcast`, `rain`, `mist`, `starry`, `snow`, `light on`/`light off`/`headlight`, `mute`/`unmute`, `skip`, `back`, `hide`, `show`, `easier`/`gear down`, `harder`/`gear up`, `flat`, `full`).
 - **Procedural Audio & Ride Log**: Web Audio wind/tyre/rain soundscape and local ride history.
 
 ## Launching the App
@@ -46,9 +46,12 @@ npm run dist:win
 |---|---|
 | `↑` / `↓` or Power slider | Adjust target power (watts) |
 | `→` / `←` or Skip button | Jump 250 m forward / backward |
-| `1` – `5` | Switch weather (Golden, Overcast, Rain, Mist, Starry) |
+| `1` – `6` | Switch weather (Golden, Deep Sunset, Overcast, Rain, Mist, Starry) |
+| `L` or Light button | Toggle bike headlight |
+| `M` or Sound button | Mute / unmute audio |
+| `F` | Toggle FPS & frame-time overlay |
 | `H` or Hide info | Toggle clean view (click or press `H` to restore) |
-| **Course ▾** | Open the course selector panel |
+| **Course ▾** / **Weather ▾** | Open course or weather selector panels |
 | `−` / `+` Hills | Adjust smart trainer gradient scaling (`0%–100%`) |
 
 ## Adding New Courses

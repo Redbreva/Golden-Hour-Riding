@@ -191,6 +191,28 @@ export function createCockpit(camera) {
   screen.position.y = 0.0081;
   unit.add(screen);
 
+  const headUnitMount = new THREE.Object3D();
+  headUnitMount.position.set(0, 0.008, -0.10);
+  rig.add(headUnitMount);
+
+  // Under-mounted cycling headlight (toggled with L key or button)
+  const headlight = new THREE.SpotLight(0xfff4e0, 0, 75, Math.PI / 4.8, 0.55, 1.3);
+  headlight.position.set(0, 0.004, -0.10);
+  const headlightTarget = new THREE.Object3D();
+  headlightTarget.position.set(0, -1.6, -16.0);
+  rig.add(headlightTarget);
+  headlight.target = headlightTarget;
+  rig.add(headlight);
+
+  let headlightOn = false;
+  function setHeadlight(on) {
+    headlightOn = Boolean(on);
+    headlight.intensity = headlightOn ? 32 : 0;
+  }
+  function isHeadlightOn() {
+    return headlightOn;
+  }
+
   // Spinning front wheel (tyre, tan sidewall, deep-section carbon rim, and spokes)
   const wheelGroup = new THREE.Group();
   wheelGroup.position.set(0, -0.66, -0.12);
@@ -263,5 +285,5 @@ export function createCockpit(camera) {
     wheelGroup.rotation.x -= (speedMs / 0.335) * dt;
   }
 
-  return { rig, drawHeadUnit, spinWheel };
+  return { rig, drawHeadUnit, spinWheel, setHeadlight, isHeadlightOn };
 }

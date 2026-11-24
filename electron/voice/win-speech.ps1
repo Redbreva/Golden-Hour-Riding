@@ -14,7 +14,7 @@ try {
     $engine = New-Object System.Speech.Recognition.SpeechRecognitionEngine
     $choices = New-Object System.Speech.Recognition.Choices
     $phrases = @(
-        "golden", "sun", "sunny", "sunshine", "sunset", "clear", "evening",
+        "golden", "sun", "sunny", "sunshine", "sunset", "dusk", "clear", "evening",
         "overcast", "cloud", "clouds", "cloudy", "grey", "gray",
         "rain", "raining", "rainy", "storm", "wet",
         "mist", "misty", "fog", "foggy",
@@ -25,7 +25,9 @@ try {
         "easier", "easy", "lighter", "less", "ease", "gear down", "shift down", "lower gear", "down a gear",
         "harder", "hard", "heavier", "more", "tougher", "gear up", "shift up", "higher gear", "up a gear",
         "flat", "no hills", "hills off",
-        "full", "real hills", "all of it"
+        "full", "real hills", "all of it",
+        "light", "light on", "light off", "headlight", "headlight on", "headlight off",
+        "mute", "unmute", "sound off", "sound on"
     )
     $choices.Add($phrases)
 

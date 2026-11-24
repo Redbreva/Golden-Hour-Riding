@@ -372,12 +372,30 @@ body.clean #controls,
 body.clean #course-panel,
 body.clean #weather-panel,
 body.clean #ride-log,
+body.clean #fps-badge,
 body.clean #credit {
   display: none;
 }
 
 body.clean {
   cursor: none;
+}
+
+#fps-badge {
+  position: fixed;
+  right: 18px;
+  bottom: 30px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(20, 16, 12, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(6px);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  color: #a8f5a8;
+  z-index: 12;
+  pointer-events: none;
 }
 
 #credit {

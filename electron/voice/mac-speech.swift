@@ -13,7 +13,7 @@ func emit(_ dict: [String: String]) {
 }
 
 let COMMAND_VOCAB = [
-    "golden", "sunny", "sunshine", "sunset", "clear",
+    "golden", "sunny", "sunshine", "sunset", "dusk", "clear",
     "overcast", "cloudy", "clouds", "grey",
     "rain", "raining", "rainy", "storm", "wet",
     "mist", "misty", "fog", "foggy",
@@ -25,6 +25,7 @@ let COMMAND_VOCAB = [
     "harder", "hard", "heavier", "gear up", "shift up", "higher gear",
     "flat", "no hills", "hills off",
     "full", "real hills",
+    "light", "light on", "light off", "headlight", "headlight on", "headlight off",
     "mute", "unmute", "sound off", "sound on"
 ]
 

@@ -30,6 +30,7 @@
       <span id="hills-label">Hills 50 %</span>
       <button id="btn-hills-up" type="button" aria-label="Make hills harder">+</button>
     </div>
+    <button id="btn-light" type="button" title="Toggle bike headlight (L key)">Light: off</button>
     <button id="btn-sound" type="button" class="on" title="Toggle wind/tyre/rain audio (M key). Automatically mutes when window is unfocused.">Sound: on</button>
     <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info</button>
     <button id="btn-log" type="button" title="Ride history stored locally">Log</button>
@@ -38,6 +39,7 @@
   <aside id="course-panel" hidden aria-label="Course selector"></aside>
   <aside id="weather-panel" hidden aria-label="Weather selector"></aside>
   <aside id="ride-log" hidden aria-label="Ride log"></aside>
+  <div id="fps-badge" hidden aria-hidden="true">-- FPS</div>
   <div id="credit"></div>
 
   <dialog id="bt-modal" aria-labelledby="bt-modal-title">
