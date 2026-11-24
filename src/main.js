@@ -106,31 +106,91 @@ function closeCoursePanel() {
   courseBtn.setAttribute('aria-expanded', 'false');
 }
 
+function closeAllPanels() {
+  closeCoursePanel();
+  closeWeatherPanel();
+  const logPanel = $('ride-log');
+  if (!logPanel.hidden) {
+    logPanel.hidden = true;
+    $('btn-log').classList.remove('on');
+  }
+}
+
 courseBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   const willOpen = coursePanel.hidden;
+  closeAllPanels();
   if (willOpen) {
-    // Close ride log if open so panels don't overlap
-    const logPanel = $('ride-log');
-    if (!logPanel.hidden) {
-      logPanel.hidden = true;
-      $('btn-log').classList.remove('on');
-    }
     renderCoursePanel();
     coursePanel.hidden = false;
     courseBtn.classList.add('on');
     courseBtn.setAttribute('aria-expanded', 'true');
-  } else {
-    closeCoursePanel();
   }
 });
 
 coursePanel.addEventListener('click', (e) => e.stopPropagation());
+
+// Weather selector panel
+const WEATHER_OPTIONS = [
+  ...(winterMode ? [{ id: 'snow', name: 'Snow', subtitle: 'Winter dusk with gentle falling snow', key: 'Snow' }] : []),
+  { id: 'golden', name: 'Golden Hour', subtitle: 'Low warm sun, long shadows & light shafts', key: '1' },
+  { id: 'overcast', name: 'Overcast', subtitle: 'Soft diffuse light under a grey cloud deck', key: '2' },
+  { id: 'rain', name: 'Rain', subtitle: 'Falling streaks, wet tarmac ripples & lens drops', key: '3' },
+  { id: 'mist', name: 'Mist', subtitle: 'Thick valley fog with soft sunlit rays', key: '4' },
+  { id: 'starry', name: 'Starry Night', subtitle: 'Swirling night sky with painterly brush filter', key: '5' },
+];
+const weatherBtn = $('btn-weather');
+const weatherPanel = $('weather-panel');
+
+function closeWeatherPanel() {
+  weatherPanel.hidden = true;
+  weatherBtn.classList.remove('on');
+  weatherBtn.setAttribute('aria-expanded', 'false');
+}
+
+function renderWeatherPanel() {
+  weatherPanel.innerHTML =
+    `<h3>Select Weather</h3><div class="course-list">` +
+    WEATHER_OPTIONS.map(
+      (w) =>
+        `<button type="button" class="course-card${w.id === weather.currentName ? ' active' : ''}" data-weather="${w.id}">` +
+        `<div class="course-card-head"><span class="course-card-name">${w.name}</span><span class="course-badge">${w.key}</span></div>` +
+        `<div class="course-card-sub">${w.subtitle}</div>` +
+        `</button>`
+    ).join('') +
+    `</div>`;
+
+  weatherPanel.querySelectorAll('.course-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      weather.setWeather(card.dataset.weather);
+      closeWeatherPanel();
+    });
+  });
+}
+
+weatherBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = weatherPanel.hidden;
+  closeAllPanels();
+  if (willOpen) {
+    renderWeatherPanel();
+    weatherPanel.hidden = false;
+    weatherBtn.classList.add('on');
+    weatherBtn.setAttribute('aria-expanded', 'true');
+  }
+});
+
+weatherPanel.addEventListener('click', (e) => e.stopPropagation());
+
 window.addEventListener('click', () => {
   if (!coursePanel.hidden) closeCoursePanel();
+  if (!weatherPanel.hidden) closeWeatherPanel();
 });
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !coursePanel.hidden) closeCoursePanel();
+  if (e.key === 'Escape') {
+    if (!coursePanel.hidden) closeCoursePanel();
+    if (!weatherPanel.hidden) closeWeatherPanel();
+  }
 });
 
 const images = await loadSurfaceImages();
@@ -147,16 +207,14 @@ window.ride = state;
 
 $('btn-log').addEventListener('click', () => {
   if (!coursePanel.hidden) closeCoursePanel();
+  if (!weatherPanel.hidden) closeWeatherPanel();
 });
 
-// Weather buttons & hotkeys (1-5)
-document.querySelectorAll('#weather-group button').forEach((btn) => {
-  btn.addEventListener('click', () => weather.setWeather(btn.dataset.weather));
-});
-if (!winterMode) {
-  document.querySelector('#weather-group [data-weather="snow"]')?.remove();
-} else {
+// Initial weather label
+if (winterMode) {
   weather.setWeather('snow', true);
+} else {
+  weather.setWeather('golden', true);
 }
 
 const setTargetPower = (w) => {
@@ -189,10 +247,29 @@ window.addEventListener('keydown', (e) => {
   if ((e.key === 'h' || e.key === 'H') && !e.metaKey && !e.ctrlKey && !e.altKey) {
     setCleanMode(!isCleanMode());
   }
+  if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleSound();
+  }
   const weatherKey = ['golden', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
   if (weatherKey) weather.setWeather(weatherKey);
 });
 
+const soundBtn = $('btn-sound');
+function toggleSound() {
+  const nextMuted = !audio.isMuted();
+  audio.setMuted(nextMuted);
+  soundBtn.textContent = nextMuted ? 'Sound: off' : 'Sound: on';
+  soundBtn.classList.toggle('on', !nextMuted);
+}
+soundBtn.addEventListener('click', toggleSound);
+
+audio.unlock();
+window.addEventListener('focus', () => {
+  audio.unlock();
+  audio.setFocused(true);
+});
+window.addEventListener('blur', () => audio.setFocused(false));
+document.addEventListener('visibilitychange', () => audio.setFocused(!document.hidden && document.hasFocus()));
 window.addEventListener('pointerdown', () => audio.unlock());
 window.addEventListener('keydown', () => audio.unlock());
 
@@ -215,6 +292,11 @@ initVoiceControl({
   setWeather: (w) => weather.setWeather(w),
   skipDistance,
   setCleanMode,
+  setMuted: (muted) => {
+    audio.setMuted(muted);
+    soundBtn.textContent = muted ? 'Sound: off' : 'Sound: on';
+    soundBtn.classList.toggle('on', !muted);
+  },
   adjustHills: (delta) => trainer.setHills(trainer.getHillsPercent() + delta),
   setHills: (pct) => trainer.setHills(pct),
   getHillsLabel: () => trainer.getHillsLabel(),

@@ -266,6 +266,15 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
   let target = presets.golden;
   let currentName = 'golden';
 
+  const WEATHER_LABELS = {
+    golden: 'Golden',
+    overcast: 'Overcast',
+    rain: 'Rain',
+    mist: 'Mist',
+    starry: 'Starry',
+    snow: 'Snow',
+  };
+
   function setWeather(name, instant = false) {
     if (!presets[name]) return;
     currentName = name;
@@ -291,8 +300,12 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
     u.uZ.value.copy(saved[2]);
     u.uPaint.value = saved[3];
 
-    document.querySelectorAll('#weather-group button').forEach((btn) => {
-      btn.classList.toggle('on', btn.dataset.weather === name);
+    const weatherBtn = document.getElementById('btn-weather');
+    if (weatherBtn) {
+      weatherBtn.textContent = `Weather: ${WEATHER_LABELS[name] || name} ▾`;
+    }
+    document.querySelectorAll('#weather-panel .course-card').forEach((card) => {
+      card.classList.toggle('active', card.dataset.weather === name);
     });
   }
 

@@ -128,7 +128,8 @@ canvas#scene-canvas {
   text-align: center;
 }
 
-#course-panel {
+#course-panel,
+#weather-panel {
   position: fixed;
   top: 64px;
   right: 18px;
@@ -144,7 +145,8 @@ canvas#scene-canvas {
   z-index: 16;
 }
 
-#course-panel h3 {
+#course-panel h3,
+#weather-panel h3 {
   margin: 0 0 10px;
   font-size: 11px;
   font-weight: 600;
@@ -368,6 +370,7 @@ dialog#bt-modal .bt-actions button {
 body.clean #hud,
 body.clean #controls,
 body.clean #course-panel,
+body.clean #weather-panel,
 body.clean #ride-log,
 body.clean #credit {
   display: none;

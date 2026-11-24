@@ -1,14 +1,23 @@
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
+const { createVoiceService } = require('./voice-service.cjs');
 
-// Enable Web Bluetooth features in Electron's Chromium runtime
+// Enable Web Bluetooth and immediate desktop audio in Electron's Chromium runtime
 app.commandLine.appendSwitch('enable-experimental-web-platform-features');
 app.commandLine.appendSwitch('enable-web-bluetooth');
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 let mainWindow = null;
 let pendingBtCallback = null;
+const voiceService = createVoiceService(ipcMain, () => mainWindow);
+
+const iconPath = path.join(__dirname, '..', 'build', 'icon.png');
 
 function createWindow() {
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(iconPath);
+  }
+
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -16,6 +25,7 @@ function createWindow() {
     minHeight: 600,
     backgroundColor: '#0b0a09',
     title: 'Golden Hour Riding',
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -24,12 +34,12 @@ function createWindow() {
     },
   });
 
-  // Grant Bluetooth & media permissions for smart trainer + voice control
+  // Grant Bluetooth permissions for smart trainers
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
-    return ['bluetooth', 'media', 'audioCapture'].includes(permission);
+    return permission === 'bluetooth';
   });
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
-    callback(['bluetooth', 'media', 'audioCapture'].includes(permission));
+    callback(permission === 'bluetooth');
   });
 
   // Bridge Chromium's select-bluetooth-device event to our in-app picker UI
@@ -43,14 +53,11 @@ function createWindow() {
     mainWindow.webContents.send('bt:device-list', devices);
   });
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
-  }
+  mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+    voiceService.stop();
     if (pendingBtCallback) {
       pendingBtCallback('');
       pendingBtCallback = null;

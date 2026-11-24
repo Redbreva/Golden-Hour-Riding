@@ -1,17 +1,32 @@
 // Procedural Web Audio soundscape: wind, tyre hum, and rain hiss
+// Only plays when the app window has focus (and is not manually muted).
 
 export function createAudioEngine() {
   let ctx = null;
+  let master = null;
   let channels = null;
+  let focused = document.hasFocus();
+  let muted = false;
+
+  function applyMasterGain() {
+    if (!ctx || !master) return;
+    const target = focused && !muted ? 1 : 0;
+    master.gain.setTargetAtTime(target, ctx.currentTime, 0.12);
+  }
 
   function unlock() {
     if (ctx) {
       if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+      applyMasterGain();
       return;
     }
     const AudioCtx = window.AudioContext || window.webkitAudioContext;
     if (!AudioCtx) return;
     ctx = new AudioCtx();
+    master = ctx.createGain();
+    master.gain.value = focused && !muted ? 1 : 0;
+    master.connect(ctx.destination);
+
     const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
@@ -26,7 +41,7 @@ export function createAudioEngine() {
       filter.Q.value = q;
       const gain = ctx.createGain();
       gain.gain.value = 0;
-      src.connect(filter).connect(gain).connect(ctx.destination);
+      src.connect(filter).connect(gain).connect(master);
       src.start();
       return { filter, gain };
     };
@@ -38,6 +53,20 @@ export function createAudioEngine() {
     };
   }
 
+  function setFocused(isFocused) {
+    focused = Boolean(isFocused);
+    applyMasterGain();
+  }
+
+  function setMuted(isMuted) {
+    muted = Boolean(isMuted);
+    applyMasterGain();
+  }
+
+  function isMuted() {
+    return muted;
+  }
+
   function update(speedMs, rainAmount) {
     if (!ctx || !channels) return;
     const t = ctx.currentTime;
@@ -47,5 +76,5 @@ export function createAudioEngine() {
     channels.rain.gain.gain.setTargetAtTime(rainAmount * 0.1, t, 0.4);
   }
 
-  return { unlock, update };
+  return { unlock, setFocused, setMuted, isMuted, update };
 }

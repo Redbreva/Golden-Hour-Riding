@@ -10,3 +10,13 @@ contextBridge.exposeInMainWorld('electronBluetooth', {
     ipcRenderer.send('bt:select-device', deviceId);
   },
 });
+
+contextBridge.exposeInMainWorld('electronVoice', {
+  start: () => ipcRenderer.send('voice:start'),
+  stop: () => ipcRenderer.send('voice:stop'),
+  onEvent: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('voice:event', listener);
+    return () => ipcRenderer.removeListener('voice:event', listener);
+  },
+});

@@ -21,27 +21,22 @@
     <input id="power-slider" type="range" min="0" max="600" step="5" value="220" aria-label="Power in watts" />
     <span class="ctl-hint">↑ ↓ keys</span>
     <button id="btn-skip" type="button" title="Jump 250 m forward (→ key; ← goes back)">Skip 250 m ›</button>
-    <button id="btn-voice" type="button" title="Voice commands: golden, overcast, rain, mist, starry, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
+    <button id="btn-voice" type="button" title="Native offline voice commands: golden, overcast, rain, mist, starry, snow, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
     <button id="btn-course" type="button" aria-expanded="false" aria-controls="course-panel" title="Choose a course or theme">Course: Valley ▾</button>
-    <div id="weather-group" role="group" aria-label="Weather">
-      <button type="button" data-weather="snow">Snow</button>
-      <button type="button" data-weather="golden" class="on">Golden</button>
-      <button type="button" data-weather="overcast">Overcast</button>
-      <button type="button" data-weather="rain">Rain</button>
-      <button type="button" data-weather="mist">Mist</button>
-      <button type="button" data-weather="starry">Starry</button>
-    </div>
+    <button id="btn-weather" type="button" aria-expanded="false" aria-controls="weather-panel" title="Choose weather (or press 1–5)">Weather: Golden ▾</button>
     <button id="btn-trainer" type="button">Connect trainer</button>
     <div id="hills-group" title="Smart trainer gradient difficulty (0% = flat, 100% = full slope)">
       <button id="btn-hills-down" type="button" aria-label="Make hills easier">−</button>
       <span id="hills-label">Hills 50 %</span>
       <button id="btn-hills-up" type="button" aria-label="Make hills harder">+</button>
     </div>
+    <button id="btn-sound" type="button" class="on" title="Toggle wind/tyre/rain audio (M key). Automatically mutes when window is unfocused.">Sound: on</button>
     <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info</button>
     <button id="btn-log" type="button" title="Ride history stored locally">Log</button>
   </div>
 
   <aside id="course-panel" hidden aria-label="Course selector"></aside>
+  <aside id="weather-panel" hidden aria-label="Weather selector"></aside>
   <aside id="ride-log" hidden aria-label="Ride log"></aside>
   <div id="credit"></div>
 

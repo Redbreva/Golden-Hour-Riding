@@ -273,7 +273,7 @@ export function createTrainerController({
 
   btButton.addEventListener('click', async () => {
     if (!navigator.bluetooth) {
-      btButton.textContent = 'Needs Chrome / Edge / Electron';
+      btButton.textContent = 'Bluetooth unavailable';
       return;
     }
     if (bike.busyJoin) return;

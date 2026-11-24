@@ -1,4 +1,4 @@
-// Optional Web Speech API voice commands
+// Native OS offline voice control (macOS SFSpeechRecognizer / Windows System.Speech)
 
 export function initVoiceControl({
   button,
@@ -6,88 +6,99 @@ export function initVoiceControl({
   setWeather,
   skipDistance,
   setCleanMode,
+  setMuted,
   adjustHills,
   setHills,
   getHillsLabel,
 }) {
-  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const voiceApi = window.electronVoice;
   const commands = [
     [/\b(easier|easy|lighter|less|ease|gear down|shift down|change down|lower gear|down a gear)\b/, getHillsLabel, () => adjustHills(-20)],
     [/\b(harder|hard|heavier|more|tougher|gear up|shift up|change up|higher gear|up a gear)\b/, getHillsLabel, () => adjustHills(20)],
-    [/\b(flat|no hills|hills off)\b/, getHillsLabel, () => setHills(0)],
+    [/\b(flat|flatter|no hills|hills off)\b/, getHillsLabel, () => setHills(0)],
     [/\b(full|real hills|all of it)\b/, getHillsLabel, () => setHills(100)],
     ...(winterMode ? [[/\b(snow|snowing|snowy|christmas)\b/, 'Snow', () => setWeather('snow')]] : []),
-    [/\b(rain|raining|rainy|storm|wet)\b/, 'Rain', () => setWeather('rain')],
-    [/\b(mist|misty|fog|foggy)\b/, 'Mist', () => setWeather('mist')],
-    [/\b(overcast|cloud|clouds|cloudy|grey|gray)\b/, 'Overcast', () => setWeather('overcast')],
-    [/\b(golden|sun|sunny|sunshine|sunset|clear|evening)\b/, 'Golden', () => setWeather('golden')],
-    [/\b(starry|stars|night|painting|van gogh)\b/, 'Starry', () => setWeather('starry')],
+    [/\b(rain|reign|rayne|raining|rainy|storm|wet)\b/, 'Rain', () => setWeather('rain')],
+    [/\b(mist|missed|misty|fog|foggy)\b/, 'Mist', () => setWeather('mist')],
+    [/\b(overcast|over cast|cloud|clouds|cloudy|grey|gray)\b/, 'Overcast', () => setWeather('overcast')],
+    [/\b(golden|gold|sun|sunny|sunshine|sunset|clear|evening)\b/, 'Golden', () => setWeather('golden')],
+    [/\b(starry|story|stars|night|painting|van gogh)\b/, 'Starry', () => setWeather('starry')],
     [/\b(skip|forward|ahead)\b/, 'Skip ahead', () => skipDistance(250)],
-    [/\bback\b/, 'Skip back', () => skipDistance(-250)],
-    [/\b(hide|hidden)\b/, 'Info hidden', () => setCleanMode(true)],
+    [/\b(back|go back)\b/, 'Skip back', () => skipDistance(-250)],
+    [/\b(hide|hyde|hidden)\b/, 'Info hidden', () => setCleanMode(true)],
     [/\b(show|info|display)\b/, 'Info shown', () => setCleanMode(false)],
+    [/\b(mute|sound off|quiet|silent)\b/, 'Muted', () => setMuted(true)],
+    [/\b(unmute|sound on)\b/, 'Sound on', () => setMuted(false)],
   ];
 
-  let rec = null;
   let active = false;
   let lastHandled = 0;
+  let lastCmdKey = '';
 
   const setLabel = (text) => {
     button.textContent = text;
     button.classList.toggle('on', active);
   };
 
-  if (window.electronBluetooth) {
-    button.title = 'Web Speech API is not supported in Electron (use Chrome/Edge via npm run dev, or an offline speech engine in a future stage)';
-    button.addEventListener('click', () => setLabel('Voice: Chrome/Edge only'));
+  if (!voiceApi) {
+    button.title = 'Native voice control is unavailable';
+    button.addEventListener('click', () => setLabel('Voice: unavailable'));
     return;
   }
 
-  if (!SpeechRec) {
-    button.title = 'Voice control requires Chrome or Edge';
-    button.addEventListener('click', () => setLabel('Voice: Chrome/Edge only'));
-    return;
-  }
+  voiceApi.onEvent((payload) => {
+    if (!active) return;
 
-  button.addEventListener('click', () => {
-    if (active) {
+    if (payload.error) {
       active = false;
-      rec?.stop();
+      setLabel(`Voice: ${payload.error}`);
+      return;
+    }
+
+    if (payload.status === 'listening') {
+      setLabel('Voice: listening');
+      return;
+    }
+
+    if (payload.status === 'stopped') {
+      active = false;
       setLabel('Voice: off');
       return;
     }
-    rec = new SpeechRec();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = 'en-GB';
-    rec.onresult = (event) => {
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript.toLowerCase();
-        const match = commands.find(([rx]) => rx.test(transcript));
-        if (match && performance.now() - lastHandled > 2500) {
-          lastHandled = performance.now();
+
+    if (payload.transcript) {
+      const heard = payload.transcript.toLowerCase();
+      button.title = `Last heard: "${payload.transcript}"`;
+      const match = commands.find(([rx]) => rx.test(heard));
+      if (match) {
+        const now = performance.now();
+        const key = String(match[0]);
+        // Allow different commands rapidly (700ms), throttle identical repeats (1600ms)
+        const cooldown = key === lastCmdKey ? 1600 : 700;
+        if (now - lastHandled > cooldown) {
+          lastHandled = now;
+          lastCmdKey = key;
           match[2]();
           const feedback = typeof match[1] === 'function' ? match[1]() : match[1];
           setLabel(`Voice: ${feedback}`);
         }
       }
-    };
-    rec.onend = () => {
-      if (active) {
-        try { rec.start(); } catch {}
-      }
-    };
-    rec.onerror = (event) => {
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        active = false;
-        setLabel('Voice: blocked');
-      } else if (event.error === 'network' || event.error === 'audio-capture') {
-        active = false;
-        setLabel('Voice: unavailable');
-      }
-    };
+    }
+  });
+
+  button.addEventListener('click', () => {
+    if (active) {
+      active = false;
+      voiceApi.stop();
+      setLabel('Voice: off');
+      return;
+    }
     active = true;
-    rec.start();
-    setLabel('Voice: listening');
+    setLabel('Voice: starting…');
+    voiceApi.start();
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (active) voiceApi.stop();
   });
 }
