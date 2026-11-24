@@ -48,6 +48,7 @@ npm run dist:win
 | `→` / `←` or Skip button | Jump 250 m forward / backward |
 | `1` – `6` | Switch weather (Golden, Deep Sunset, Overcast, Rain, Mist, Starry) |
 | `L` or Light button | Toggle bike headlight |
+| `Q` or Res button | Cycle render resolution (`0.75×`, `1×`, and `Retina` on HiDPI displays) |
 | `M` or Sound button | Mute / unmute audio |
 | `F` | Toggle FPS & frame-time overlay |
 | `H` or Hide info | Toggle clean view (click or press `H` to restore) |

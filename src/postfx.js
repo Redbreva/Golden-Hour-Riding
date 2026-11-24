@@ -8,13 +8,14 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 export function createPostProcessing(renderer, scene, camera, hazeLum) {
   const rt = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight, {
     type: THREE.HalfFloatType,
-    samples: 4,
+    samples: 2,
   });
   const composer = new EffectComposer(renderer, rt);
+  composer.setPixelRatio(renderer.getPixelRatio());
   composer.addPass(new RenderPass(scene, camera));
 
   const bloom = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(Math.max(1, Math.floor(window.innerWidth * 0.5)), Math.max(1, Math.floor(window.innerHeight * 0.5))),
     0.22,
     0.6,
     3.5
@@ -34,15 +35,16 @@ export function createPostProcessing(renderer, scene, camera, hazeLum) {
       uniform sampler2D tDiffuse; uniform vec2 uSunUv; uniform float uAmt, uThr; varying vec2 vUv;
       void main(){
         vec3 base = texture2D(tDiffuse, vUv).rgb;
+        if (uAmt < 0.005) { gl_FragColor = vec4(base, 1.); return; }
         vec2 d = uSunUv - vUv;
         float j = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
         vec3 acc = vec3(0.); float w = 1., tot = 0.;
-        for (int i = 0; i < 36; i++) {
-          vec2 uv = vUv + d * ((float(i) + j) / 36.) * 0.92;
+        for (int i = 0; i < 18; i++) {
+          vec2 uv = vUv + d * ((float(i) + j) / 18.) * 0.92;
           float inb = step(0., uv.x) * step(uv.x, 1.) * step(0., uv.y) * step(uv.y, 1.);
           vec3 c = texture2D(tDiffuse, uv).rgb;
           acc += c * smoothstep(uThr, uThr * 2.5, dot(c, vec3(0.3, 0.6, 0.1))) * w * inb;
-          tot += w; w *= 0.965;
+          tot += w; w *= 0.931;
         }
         gl_FragColor = vec4(base + acc / tot * uAmt, 1.);
       }`,
@@ -102,8 +104,13 @@ export function createPostProcessing(renderer, scene, camera, hazeLum) {
         vec3 dr = uRain > 0.01 ? drops(vUv, uTime) * uRain : vec3(0.);
         vec2 uv0 = vUv + dr.xy;
         vec3 col = vec3(0.);
-        for (int i = 0; i < 8; i++) col += texture2D(tDiffuse, uv0 - dir * (float(i) / 7.)).rgb;
-        col = col / 8. + dr.z * 0.012;
+        if (uSpeed < 0.15) {
+          col = texture2D(tDiffuse, uv0).rgb;
+        } else {
+          for (int i = 0; i < 5; i++) col += texture2D(tDiffuse, uv0 - dir * (float(i) / 4.)).rgb;
+          col *= 0.2;
+        }
+        col += dr.z * 0.012;
         if (uPaint > 0.01) col = mix(col, painted(uv0), uPaint);
         col *= 1. - smoothstep(0.12, 0.62, r2) * 0.55;
         col += (h(vUv * 917. + fract(uTime) * 31.) - 0.5) * 0.035;
@@ -112,10 +119,21 @@ export function createPostProcessing(renderer, scene, camera, hazeLum) {
   });
   composer.addPass(lens);
 
-  function resize(width, height) {
+  function applySizes(width, height, dpr) {
+    composer.setPixelRatio(dpr);
     composer.setSize(width, height);
+    // Keep bloom at half resolution — visually identical for soft glow, 4x cheaper
+    bloom.setSize(Math.max(1, Math.floor(width * dpr * 0.5)), Math.max(1, Math.floor(height * dpr * 0.5)));
     lens.uniforms.uAspect.value = width / height;
   }
 
-  return { composer, rays, lens, resize };
+  applySizes(window.innerWidth, window.innerHeight, renderer.getPixelRatio());
+
+  return {
+    composer,
+    rays,
+    lens,
+    resize: (width, height) => applySizes(width, height, renderer.getPixelRatio()),
+    setPixelRatio: (dpr, width, height) => applySizes(width, height, dpr),
+  };
 }

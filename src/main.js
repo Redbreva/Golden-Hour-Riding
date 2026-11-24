@@ -23,9 +23,19 @@ const winterMode = Boolean(activeCourseDef.winter);
 const sceneryParam = params.get('scenery');
 const sceneryMode = sceneryParam !== null;
 
+const hasHiDpi = (window.devicePixelRatio || 1) > 1.05;
+const RES_MODES = hasHiDpi ? ['0.75x', '1x', 'retina'] : ['0.75x', '1x'];
+let resMode = localStorage.getItem('ghr_res') || '1x';
+if (!RES_MODES.includes(resMode)) resMode = '1x';
+function getActivePixelRatio() {
+  if (resMode === 'retina') return Math.min(window.devicePixelRatio, 2);
+  if (resMode === '0.75x') return 0.75;
+  return 1;
+}
+
 const canvas = $('scene-canvas');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setPixelRatio(getActivePixelRatio());
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.33;
@@ -57,7 +67,7 @@ const uniforms = {
   uCloudLit: { value: new V3() },
   uCloudDark: { value: new V3() },
   uCloudHaze: { value: new V3() },
-  uPx: { value: (window.innerHeight * Math.min(window.devicePixelRatio, 2)) / (2 * Math.tan(0.6)) },
+  uPx: { value: (window.innerHeight * getActivePixelRatio()) / (2 * Math.tan(0.6)) },
 };
 
 let realData = null;
@@ -258,9 +268,32 @@ window.addEventListener('keydown', (e) => {
     const badge = $('fps-badge');
     badge.hidden = !badge.hidden;
   }
+  if ((e.key === 'q' || e.key === 'Q') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleResolution();
+  }
   const weatherKey = ['golden', 'sunset', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
   if (weatherKey) weather.setWeather(weatherKey);
 });
+
+const resBtn = $('btn-res');
+function updateResButton() {
+  const label = resMode === 'retina' ? 'Retina' : resMode === '0.75x' ? '0.75×' : '1×';
+  resBtn.textContent = `Res: ${label}`;
+  resBtn.classList.toggle('on', resMode === 'retina');
+}
+function toggleResolution() {
+  const nextIdx = (RES_MODES.indexOf(resMode) + 1) % RES_MODES.length;
+  resMode = RES_MODES[nextIdx];
+  localStorage.setItem('ghr_res', resMode);
+  const dpr = getActivePixelRatio();
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  postfx.setPixelRatio(dpr, window.innerWidth, window.innerHeight);
+  uniforms.uPx.value = (window.innerHeight * dpr) / (2 * Math.tan(0.6));
+  updateResButton();
+}
+updateResButton();
+resBtn.addEventListener('click', toggleResolution);
 
 const lightBtn = $('btn-light');
 function setHeadlight(on) {
@@ -328,11 +361,13 @@ initRideLog({
 });
 
 window.addEventListener('resize', () => {
+  const dpr = getActivePixelRatio();
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
+  renderer.setPixelRatio(dpr);
   renderer.setSize(window.innerWidth, window.innerHeight);
-  postfx.resize(window.innerWidth, window.innerHeight);
-  uniforms.uPx.value = (window.innerHeight * Math.min(window.devicePixelRatio, 2)) / (2 * Math.tan(0.6));
+  postfx.setPixelRatio(dpr, window.innerWidth, window.innerHeight);
+  uniforms.uPx.value = (window.innerHeight * dpr) / (2 * Math.tan(0.6));
 });
 
 // Scenery autopilot plan
@@ -422,8 +457,10 @@ function animate() {
   // Post-processing uniforms
   sunNdc.copy(camera.position).addScaledVector(weather.sunDir, 1000).project(camera);
   postfx.rays.uniforms.uSunUv.value.set(sunNdc.x * 0.5 + 0.5, sunNdc.y * 0.5 + 0.5);
-  postfx.rays.uniforms.uAmt.value =
+  const raysAmt =
     0.25 * weather.current.rays * smoothstep(0.1, 0.6, camera.getWorldDirection(fwdDir).dot(weather.sunDir));
+  postfx.rays.uniforms.uAmt.value = raysAmt;
+  postfx.rays.enabled = raysAmt > 0.005;
   postfx.lens.uniforms.uSpeed.value = Math.min(1, state.v / 22);
   postfx.lens.uniforms.uTime.value = uniforms.uTime.value;
   postfx.lens.uniforms.uRain.value = weather.current.rain;
