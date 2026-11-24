@@ -1,4 +1,5 @@
 // Local ride log stored in localStorage
+import { getCourseById } from './courses.js';
 
 const STORAGE_KEY = 'golden-hour-riding-log';
 const MIN_METRES = 100;
@@ -61,7 +62,7 @@ export function initRideLog({ panel, toggleBtn, courseId = 'valley', getDistance
       .reverse()
       .map(
         (r) =>
-          `<tr><td>${formatDay(r.t)}</td><td class="muted">${r.c === 'leckhampton' ? 'Leckhampton' : 'Valley'}</td><td class="muted">${formatDuration(r.s)}</td><td>${formatKm(r.m)} km</td></tr>`
+          `<tr><td>${formatDay(r.t)}</td><td class="muted">${getCourseById(r.c)?.shortName || r.c}</td><td class="muted">${formatDuration(r.s)}</td><td>${formatKm(r.m)} km</td></tr>`
       )
       .join('');
 

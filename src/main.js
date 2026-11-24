@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { smoothstep } from './noise.js';
 import { loadSurfaceImages } from './textures.js';
+import { COURSES, resolveCourseFromSearch } from './courses.js';
 import { createCourse, loadRealCourseData } from './course.js';
 import { createWeatherSystem } from './weather.js';
 import { buildWorld } from './world.js';
@@ -16,8 +17,9 @@ const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
 
 const params = new URLSearchParams(window.location.search);
-const courseId = params.get('course') === 'leckhampton' ? 'leckhampton' : 'valley';
-const winterMode = params.get('theme') === 'christmas' && courseId !== 'leckhampton';
+const activeCourseDef = resolveCourseFromSearch(window.location.search);
+const courseId = activeCourseDef.id;
+const winterMode = Boolean(activeCourseDef.winter);
 const sceneryParam = params.get('scenery');
 const sceneryMode = sceneryParam !== null;
 
@@ -59,19 +61,76 @@ const uniforms = {
 };
 
 let realData = null;
-if (courseId !== 'valley') {
-  $('loading').textContent = 'Building Leckhampton Hill…';
-  realData = await loadRealCourseData(courseId);
+$('loading').textContent = activeCourseDef.loadingText || 'Building course…';
+if (activeCourseDef.type === 'real') {
+  realData = await loadRealCourseData(activeCourseDef.dataId || activeCourseDef.id);
   $('credit').textContent = realData.creditText;
 }
 
-$('btn-course').textContent = realData ? 'Course: Leckhampton' : 'Course: Valley';
-$('btn-course').addEventListener('click', () => {
-  const next = new URLSearchParams(window.location.search);
-  if (realData) next.delete('course');
-  else next.set('course', 'leckhampton');
-  const qs = next.toString();
-  window.location.search = qs ? `?${qs}` : '';
+// Course selector panel
+const courseBtn = $('btn-course');
+const coursePanel = $('course-panel');
+courseBtn.textContent = `Course: ${activeCourseDef.shortName} ▾`;
+
+function renderCoursePanel() {
+  coursePanel.innerHTML =
+    `<h3>Select Course</h3><div class="course-list">` +
+    COURSES.map(
+      (c) =>
+        `<button type="button" class="course-card${c.id === activeCourseDef.id ? ' active' : ''}" data-course-id="${c.id}">` +
+        `<div class="course-card-head"><span class="course-card-name">${c.name}</span><span class="course-badge">${c.badge}</span></div>` +
+        `<div class="course-card-sub">${c.subtitle}</div>` +
+        `</button>`
+    ).join('') +
+    `</div>`;
+
+  coursePanel.querySelectorAll('.course-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const targetId = card.dataset.courseId;
+      if (targetId === activeCourseDef.id) {
+        closeCoursePanel();
+        return;
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('theme');
+      if (targetId === 'valley') url.searchParams.delete('course');
+      else url.searchParams.set('course', targetId);
+      window.location.href = url.toString();
+    });
+  });
+}
+
+function closeCoursePanel() {
+  coursePanel.hidden = true;
+  courseBtn.classList.remove('on');
+  courseBtn.setAttribute('aria-expanded', 'false');
+}
+
+courseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const willOpen = coursePanel.hidden;
+  if (willOpen) {
+    // Close ride log if open so panels don't overlap
+    const logPanel = $('ride-log');
+    if (!logPanel.hidden) {
+      logPanel.hidden = true;
+      $('btn-log').classList.remove('on');
+    }
+    renderCoursePanel();
+    coursePanel.hidden = false;
+    courseBtn.classList.add('on');
+    courseBtn.setAttribute('aria-expanded', 'true');
+  } else {
+    closeCoursePanel();
+  }
+});
+
+coursePanel.addEventListener('click', (e) => e.stopPropagation());
+window.addEventListener('click', () => {
+  if (!coursePanel.hidden) closeCoursePanel();
+});
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !coursePanel.hidden) closeCoursePanel();
 });
 
 const images = await loadSurfaceImages();
@@ -83,8 +142,12 @@ const postfx = createPostProcessing(renderer, scene, camera, weather.hazeLum);
 const audio = createAudioEngine();
 
 const state = createRideState();
-state.s = course.startDistance;
+state.s = activeCourseDef.startDistance ?? course.startDistance;
 window.ride = state;
+
+$('btn-log').addEventListener('click', () => {
+  if (!coursePanel.hidden) closeCoursePanel();
+});
 
 // Weather buttons & hotkeys (1-5)
 document.querySelectorAll('#weather-group button').forEach((btn) => {

@@ -22,7 +22,7 @@
     <span class="ctl-hint">↑ ↓ keys</span>
     <button id="btn-skip" type="button" title="Jump 250 m forward (→ key; ← goes back)">Skip 250 m ›</button>
     <button id="btn-voice" type="button" title="Voice commands: golden, overcast, rain, mist, starry, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
-    <button id="btn-course" type="button" title="Switch between the Alpine Valley loop and Leckhampton Hill">Course: Valley</button>
+    <button id="btn-course" type="button" aria-expanded="false" aria-controls="course-panel" title="Choose a course or theme">Course: Valley ▾</button>
     <div id="weather-group" role="group" aria-label="Weather">
       <button type="button" data-weather="snow">Snow</button>
       <button type="button" data-weather="golden" class="on">Golden</button>
@@ -41,6 +41,7 @@
     <button id="btn-log" type="button" title="Ride history stored locally">Log</button>
   </div>
 
+  <aside id="course-panel" hidden aria-label="Course selector"></aside>
   <aside id="ride-log" hidden aria-label="Ride log"></aside>
   <div id="credit"></div>
 

@@ -128,6 +128,90 @@ canvas#scene-canvas {
   text-align: center;
 }
 
+#course-panel {
+  position: fixed;
+  top: 64px;
+  right: 18px;
+  width: 310px;
+  max-height: 72vh;
+  overflow: auto;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(20, 16, 12, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(12px);
+  color: #fff;
+  z-index: 16;
+}
+
+#course-panel h3 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.course-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-card {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.course-card:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.course-card.active {
+  background: rgba(255, 207, 143, 0.2);
+  border-color: #ffcf8f;
+}
+
+.course-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.course-card-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.course-badge {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.course-card-sub {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.72;
+}
+
 #ride-log {
   position: fixed;
   top: 64px;
@@ -283,6 +367,7 @@ dialog#bt-modal .bt-actions button {
 
 body.clean #hud,
 body.clean #controls,
+body.clean #course-panel,
 body.clean #ride-log,
 body.clean #credit {
   display: none;
