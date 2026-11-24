@@ -6,3 +6,4 @@ release/
 .env
 *.env
 electron/voice/mac-speech
+godot-prototype/.godot/
