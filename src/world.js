@@ -161,25 +161,45 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
   terrainMat.onBeforeCompile = (shader) => {
     shader.uniforms.uRock = { value: rockMap };
     shader.uniforms.uSunAmt = uniforms.uSunAmt;
+    shader.uniforms.uSunDir = { value: weather.sunDir };
+    shader.uniforms.uValleyY = { value: real ? 105.0 : 32.0 };
     shader.vertexShader =
-      'attribute vec2 aMix; attribute float aShade; varying vec2 vMix; varying float vShade;\n' +
-      shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vMix = aMix; vShade = aShade;');
-    shader.fragmentShader =
-      'uniform sampler2D uRock; uniform float uSunAmt; varying vec2 vMix; varying float vShade;\n' +
-      shader.fragmentShader.replace(
-        '#include <map_fragment>',
-        `
-        vec3 gc = mix(texture2D(map, vMapUv).rgb, texture2D(map, vMapUv * 0.137).rgb, 0.15);
-        gc = mix(gc, vec3(gc.g * 0.6, gc.g * 1.05, gc.g * 0.35), 0.4);
-        vec3 r1 = texture2D(uRock, vMapUv * 0.3).rgb;
-        vec3 r2 = texture2D(uRock, vMapUv * 0.041).rgb;
-        vec3 r3 = texture2D(uRock, vMapUv * 0.009).rgb;
-        float l2 = dot(r2, vec3(0.333)), l3 = dot(r3, vec3(0.333));
-        vec3 rc = mix(r1, r2, 0.4) * (0.35 + l2 * 1.2 + l3 * 1.6);
-        float rockAmt = smoothstep(0.3, 0.7, vMix.x + (l2 - 0.3) * 0.9);
-        float snowAmt = smoothstep(0.35, 0.65, vMix.y + (l3 - 0.3) * 0.8);
-        diffuseColor.rgb *= mix(mix(gc, rc, rockAmt), ${winterMode ? 'vec3(0.66, 0.70, 0.78)' : 'vec3(0.92)'}, snowAmt) * mix(1., vShade, uSunAmt);`
+      'attribute vec2 aMix; attribute float aShade; varying vec2 vMix; varying float vShade; varying vec3 vWorldPos;\n' +
+      shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        '#include <begin_vertex>\n vMix = aMix; vShade = aShade; vWorldPos = (modelMatrix * vec4(transformed, 1.)).xyz;'
       );
+    shader.fragmentShader =
+      'uniform sampler2D uRock; uniform float uSunAmt, uValleyY; uniform vec3 uSunDir; varying vec2 vMix; varying float vShade; varying vec3 vWorldPos;\n' +
+      shader.fragmentShader
+        .replace(
+          '#include <map_fragment>',
+          `
+          vec3 gc = mix(texture2D(map, vMapUv).rgb, texture2D(map, vMapUv * 0.137).rgb, 0.15);
+          gc = mix(gc, vec3(gc.g * 0.6, gc.g * 1.05, gc.g * 0.35), 0.4);
+          vec3 r1 = texture2D(uRock, vMapUv * 0.3).rgb;
+          vec3 r2 = texture2D(uRock, vMapUv * 0.041).rgb;
+          vec3 r3 = texture2D(uRock, vMapUv * 0.009).rgb;
+          float l2 = dot(r2, vec3(0.333)), l3 = dot(r3, vec3(0.333));
+          vec3 rc = mix(r1, r2, 0.4) * (0.35 + l2 * 1.2 + l3 * 1.6);
+          float rockAmt = smoothstep(0.3, 0.7, vMix.x + (l2 - 0.3) * 0.9);
+          float snowAmt = smoothstep(0.35, 0.65, vMix.y + (l3 - 0.3) * 0.8);
+          diffuseColor.rgb *= mix(mix(gc, rc, rockAmt), ${winterMode ? 'vec3(0.66, 0.70, 0.78)' : 'vec3(0.92)'}, snowAmt) * mix(1., vShade, uSunAmt);`
+        )
+        .replace(
+          '#include <fog_fragment>',
+          `#include <fog_fragment>
+          #ifdef USE_FOG
+            // Subtle golden valley floor mist: denser in low hollows, clearer on high ridges
+            vec3 toCam = vWorldPos - cameraPosition;
+            float distW = length(toCam);
+            float lowMask = exp(-max(0., vWorldPos.y - uValleyY) * 0.024);
+            float sunScatter = pow(max(0., dot(normalize(toCam), normalize(uSunDir))), 4.) * uSunAmt;
+            float valleyMist = (1. - exp(-distW * 0.0014 * lowMask)) * 0.42 * lowMask;
+            vec3 mistCol = mix(fogColor, fogColor * vec3(1.22, 1.04, 0.82), sunScatter * 0.65);
+            gl_FragColor.rgb = mix(gl_FragColor.rgb, mistCol, clamp(valleyMist, 0., 0.65));
+          #endif`
+        );
   };
 
   const terrain = new THREE.Mesh(tGeo, terrainMat);
@@ -205,6 +225,8 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
   roadMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
     shader.uniforms.uRain = weather.rainUniforms.uRain;
+    shader.uniforms.uSunDir = { value: weather.sunDir };
+    shader.uniforms.uSunAmt = uniforms.uSunAmt;
     shader.vertexShader =
       'varying vec3 vWp;\n' +
       shader.vertexShader.replace(
@@ -212,7 +234,7 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         '#include <begin_vertex>\n vWp = (modelMatrix * vec4(transformed, 1.)).xyz;'
       );
     shader.fragmentShader =
-      `uniform float uTime, uRain; varying vec3 vWp;
+      `uniform float uTime, uRain, uSunAmt; uniform vec3 uSunDir; varying vec3 vWp;
       vec2 rip(vec2 p, float t){
         vec2 i = floor(p), f = fract(p) - 0.5;
         float h1 = fract(sin(dot(i, vec2(127.1, 311.7))) * 43758.5453), h2 = fract(h1 * 57.31 + 0.37);
@@ -220,14 +242,26 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         vec2 d = f - (vec2(h1, h2) - 0.5) * 0.24; float r = length(d) + 1e-4, R = life * 0.36;
         return d / r * sin((r - R) * 60.) * exp(-pow((r - R) * 14., 2.)) * (1. - life);
       }\n` +
-      shader.fragmentShader.replace(
-        '#include <normal_fragment_maps>',
-        `#include <normal_fragment_maps>
-        if (uRain > 0.01) {
-          vec2 rp = rip(vWp.xz * 3.2, uTime) + rip(vWp.xz * 2.1 + 13.7, uTime * 0.9 + 3.);
-          normal = normalize(normal + (viewMatrix * vec4(rp.x, 0., rp.y, 0.)).xyz * 0.5 * uRain * smoothstep(40., 8., length(vViewPosition)));
-        }`
-      );
+      shader.fragmentShader
+        .replace(
+          '#include <normal_fragment_maps>',
+          `#include <normal_fragment_maps>
+          if (uRain > 0.01) {
+            vec2 rp = rip(vWp.xz * 3.2, uTime) + rip(vWp.xz * 2.1 + 13.7, uTime * 0.9 + 3.);
+            normal = normalize(normal + (viewMatrix * vec4(rp.x, 0., rp.y, 0.)).xyz * 0.5 * uRain * smoothstep(40., 8., length(vViewPosition)));
+          }`
+        )
+        .replace(
+          '#include <dithering_fragment>',
+          `// Grazing-angle golden sunset sheen on damp asphalt & puddles
+          vec3 viewDirW = normalize(cameraPosition - vWp);
+          float fresnel = pow(1. - max(0., viewDirW.y), 4.0);
+          vec3 reflDir = reflect(-viewDirW, vec3(0., 1., 0.));
+          float sunGlint = pow(max(0., dot(reflDir, normalize(uSunDir))), 18.0) * uSunAmt;
+          float dampBoost = 0.22 + uRain * 0.65;
+          gl_FragColor.rgb += vec3(1.0, 0.72, 0.42) * sunGlint * fresnel * dampBoost * 0.55;
+          #include <dithering_fragment>`
+        );
   };
 
   const road = new THREE.Mesh(buildRibbonStrip(course, -3.5, 0, 3.5, 0, 0, 1, roadTiles), roadMat);
@@ -245,6 +279,80 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
     const m = new THREE.Mesh(geo, shoulderMat);
     m.receiveShadow = true;
     scene.add(m);
+  }
+
+  /* ---------- 2b. Roadside wooden verge posts & wildflowers for foreground parallax ---------- */
+  {
+    const m4 = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const up = new V3(0, 1, 0);
+    const sc = new V3();
+    const ps = new V3();
+    const c = new THREE.Color();
+
+    // Weathered timber verge posts spaced along scenic outer bends
+    const postPositions = [];
+    for (let i = 0; i < N; i += 28) {
+      if (fbm(i / 45 + 2.1, 1.3, 2) < 0.44) continue;
+      for (const side of [-1, 1]) {
+        if (rng() < 0.35) continue;
+        const off = side * (4.15 + rng() * 0.25);
+        const x = P[i].x + R[i].x * off;
+        const z = P[i].z + R[i].z * off;
+        const y = P[i].y - 0.14;
+        postPositions.push([x, y, z, rng() * 0.12 - 0.06]);
+      }
+    }
+    if (postPositions.length) {
+      const postGeo = new THREE.CylinderGeometry(0.055, 0.068, 0.95, 6).translate(0, 0.475, 0);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x5c4b3a, roughness: 0.95 });
+      const posts = new THREE.InstancedMesh(postGeo, postMat, postPositions.length);
+      postPositions.forEach(([x, y, z, tilt], idx) => {
+        ps.set(x, y, z);
+        q.setFromEuler(new THREE.Euler(tilt, rng() * Math.PI * 2, tilt * 0.5));
+        sc.set(1, 0.85 + rng() * 0.3, 1);
+        posts.setMatrixAt(idx, m4.compose(ps, q, sc));
+        posts.setColorAt(idx, c.setHSL(0.08 + rng() * 0.03, 0.18, 0.34 + rng() * 0.16));
+      });
+      posts.castShadow = true;
+      posts.receiveShadow = true;
+      posts.frustumCulled = false;
+      scene.add(posts);
+    }
+
+    // Wildflower clusters (buttercups, daisies, cow parsley) along the verge in non-winter mode
+    if (!winterMode) {
+      const flowerCount = Math.min(4500, Math.floor(N * 1.4));
+      const flowerGeo = new THREE.IcosahedronGeometry(0.065, 0);
+      const flowerMat = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+      const flowers = new THREE.InstancedMesh(flowerGeo, flowerMat, flowerCount);
+      const palette = [
+        [0.98, 0.84, 0.22], // buttercup yellow
+        [0.96, 0.96, 0.90], // oxeye daisy white
+        [0.92, 0.95, 0.82], // cow parsley cream
+        [0.86, 0.56, 0.72], // clover pink
+      ];
+      for (let k = 0; k < flowerCount; k++) {
+        const i = Math.floor(rng() * N);
+        const side = rng() < 0.5 ? -1 : 1;
+        const d = 3.85 + Math.pow(rng(), 1.4) * 7.5;
+        const j = (rng() - 0.5) * 1.5;
+        const x = P[i].x + R[i].x * side * d + T[i].x * j;
+        const z = P[i].z + R[i].z * side * d + T[i].z * j;
+        let y = course.meshElevation(x, z);
+        if (d < 6.8) y = Math.max(y, P[i].y + T[i].y * j - (0.72 * (d - 3.5)) / 3.3);
+        const s = 0.65 + rng() * 1.1;
+        ps.set(x, y + 0.18 + rng() * 0.34, z);
+        q.setFromAxisAngle(up, rng() * Math.PI * 2);
+        sc.set(s, s * 0.65, s);
+        flowers.setMatrixAt(k, m4.compose(ps, q, sc));
+        const rgb = palette[(rng() * palette.length) | 0];
+        flowers.setColorAt(k, c.setRGB(rgb[0], rgb[1], rgb[2]));
+      }
+      flowers.receiveShadow = true;
+      flowers.frustumCulled = false;
+      scene.add(flowers);
+    }
   }
 
   /* ---------- 3. Real-course countryside: sheep flocks & hay stooks ---------- */
@@ -411,16 +519,31 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
   const grassMat = new THREE.MeshStandardMaterial({ map: grassMap, alphaTest: 0.45, roughness: 1 });
   grassMat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
+    shader.uniforms.uSunDir = { value: weather.sunDir };
+    shader.uniforms.uSunAmt = uniforms.uSunAmt;
     shader.vertexShader =
-      'uniform float uTime;\n' +
+      'uniform float uTime; varying float vTip; varying vec3 vGrassW;\n' +
       shader.vertexShader.replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
+        vTip = uv.y;
         #ifdef USE_INSTANCING
           vec4 wp = instanceMatrix * vec4(0., 0., 0., 1.);
           float w = sin(uTime * 1.7 + wp.x * 0.35 + wp.z * 0.27) * 0.16 + sin(uTime * 3.3 + wp.x * 1.3) * 0.05;
           transformed.x += w * uv.y; transformed.z += w * 0.6 * uv.y;
+          vGrassW = (instanceMatrix * vec4(transformed, 1.)).xyz;
+        #else
+          vGrassW = (modelMatrix * vec4(transformed, 1.)).xyz;
         #endif`
+      );
+    shader.fragmentShader =
+      'uniform vec3 uSunDir; uniform float uSunAmt; varying float vTip; varying vec3 vGrassW;\n' +
+      shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `vec3 vToCam = normalize(cameraPosition - vGrassW);
+        float backLit = pow(max(0., dot(-vToCam, normalize(uSunDir))), 3.5) * uSunAmt;
+        gl_FragColor.rgb += vec3(0.45, 0.34, 0.10) * backLit * vTip * vTip;
+        #include <dithering_fragment>`
       );
   };
 
@@ -768,8 +891,10 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
     });
     folMat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = uniforms.uTime;
+      shader.uniforms.uSunDir = { value: weather.sunDir };
+      shader.uniforms.uSunAmt = uniforms.uSunAmt;
       shader.vertexShader =
-        'uniform float uTime;\n' +
+        'uniform float uTime; varying vec3 vFolW;\n' +
         shader.vertexShader.replace(
           '#include <begin_vertex>',
           `#include <begin_vertex>
@@ -777,12 +902,26 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
             vec4 wp = instanceMatrix * vec4(0., 0., 0., 1.);
             transformed.x += sin(uTime * 1.1 + wp.x * 0.13 + wp.z * 0.09) * 0.022 * position.y;
             transformed.z += sin(uTime * 0.9 + wp.z * 0.11) * 0.016 * position.y;
+            vFolW = (instanceMatrix * vec4(transformed, 1.)).xyz;
+          #else
+            vFolW = (modelMatrix * vec4(transformed, 1.)).xyz;
           #endif`
         );
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <normal_fragment_begin>',
-        THREE.ShaderChunk.normal_fragment_begin.replace(/gl_FrontFacing \? 1\.0 : - ?1\.0/, '1.0')
-      );
+      shader.fragmentShader =
+        'uniform vec3 uSunDir; uniform float uSunAmt; varying vec3 vFolW;\n' +
+        shader.fragmentShader
+          .replace(
+            '#include <normal_fragment_begin>',
+            THREE.ShaderChunk.normal_fragment_begin.replace(/gl_FrontFacing \? 1\.0 : - ?1\.0/, '1.0')
+          )
+          .replace(
+            '#include <dithering_fragment>',
+            `// Golden-hour subsurface translucency when trees are backlit by the low sun
+            vec3 viewToLeaf = normalize(vFolW - cameraPosition);
+            float trans = pow(max(0., dot(viewToLeaf, normalize(uSunDir))), 3.0) * uSunAmt;
+            gl_FragColor.rgb += diffuseColor.rgb * vec3(1.15, 0.78, 0.32) * trans * 0.45;
+            #include <dithering_fragment>`
+          );
     };
 
     const trunkGeo = real

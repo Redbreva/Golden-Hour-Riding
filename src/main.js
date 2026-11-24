@@ -399,11 +399,12 @@ function animate() {
   postfx.lens.uniforms.uPaint.value = weather.current.paint;
 
   audio.update(state.v, weather.current.rain);
+  cockpit.spinWheel(state.v, dt);
 
   hudTimer -= dt;
   if (hudTimer <= 0) {
     hudTimer = 0.25;
-    cockpit.drawHeadUnit(state.v * 3.6, state.power);
+    cockpit.drawHeadUnit(state.v * 3.6, state.power, state.grade);
     $('hud-power').textContent = state.power.toFixed(0);
     $('hud-speed').textContent = (state.v * 3.6).toFixed(1);
     $('hud-grade').textContent = `${state.grade >= 0 ? '+' : ''}${state.grade.toFixed(1)}`;

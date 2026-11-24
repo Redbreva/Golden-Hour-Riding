@@ -18,9 +18,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run dist:win
+      - run: npm run build
+      - run: npx electron-builder --win nsis --x64 --publish never
       - name: Upload Windows installer to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ github.ref_name }}" "release/*Setup*.exe" --clobber
+          $exe = Get-ChildItem "release\*Setup*.exe" | Select-Object -First 1
+          gh release upload "${{ github.ref_name }}" "$($exe.FullName)" --clobber
