@@ -1,0 +1,63 @@
+{
+  "name": "golden-hour-riding",
+  "version": "0.1.0",
+  "description": "Standalone 3D indoor cycling simulator for macOS and Windows with smart trainer (FTMS) support.",
+  "main": "electron/main.cjs",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "vite build && electron .",
+    "electron": "electron .",
+    "dist": "vite build && electron-builder",
+    "dist:mac": "vite build && electron-builder --mac",
+    "dist:win": "vite build && electron-builder --win"
+  },
+  "keywords": [
+    "cycling",
+    "indoor-cycling",
+    "threejs",
+    "electron",
+    "ftms",
+    "bluetooth",
+    "smart-trainer"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.170.0"
+  },
+  "devDependencies": {
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.12",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "com.redbreva.golden-hour-riding",
+    "productName": "Golden Hour Riding",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.sports",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "extendInfo": {
+        "NSBluetoothAlwaysUsageDescription": "Golden Hour Riding uses Bluetooth to connect to smart trainers and cycling power meters.",
+        "NSMicrophoneUsageDescription": "Golden Hour Riding uses the microphone for optional voice commands."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
+  }
+}

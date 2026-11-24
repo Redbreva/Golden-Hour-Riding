@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Golden Hour Riding</title>
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <canvas id="scene-canvas"></canvas>
+
+  <div id="hud" aria-live="polite">
+    <div><b id="hud-power">220</b><span>watts</span></div>
+    <div><b id="hud-speed">0.0</b><span>km/h</span></div>
+    <div><b id="hud-grade">0.0</b><span>gradient %</span></div>
+    <div><b id="hud-dist">0.00</b><span>km</span></div>
+  </div>
+
+  <div id="controls">
+    <span class="ctl-label">POWER</span>
+    <input id="power-slider" type="range" min="0" max="600" step="5" value="220" aria-label="Power in watts" />
+    <span class="ctl-hint">↑ ↓ keys</span>
+    <button id="btn-skip" type="button" title="Jump 250 m forward (→ key; ← goes back)">Skip 250 m ›</button>
+    <button id="btn-voice" type="button" title="Voice commands: golden, overcast, rain, mist, starry, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
+    <button id="btn-course" type="button" title="Switch between the Alpine Valley loop and Leckhampton Hill">Course: Valley</button>
+    <div id="weather-group" role="group" aria-label="Weather">
+      <button type="button" data-weather="snow">Snow</button>
+      <button type="button" data-weather="golden" class="on">Golden</button>
+      <button type="button" data-weather="overcast">Overcast</button>
+      <button type="button" data-weather="rain">Rain</button>
+      <button type="button" data-weather="mist">Mist</button>
+      <button type="button" data-weather="starry">Starry</button>
+    </div>
+    <button id="btn-trainer" type="button">Connect trainer</button>
+    <div id="hills-group" title="Smart trainer gradient difficulty (0% = flat, 100% = full slope)">
+      <button id="btn-hills-down" type="button" aria-label="Make hills easier">−</button>
+      <span id="hills-label">Hills 50 %</span>
+      <button id="btn-hills-up" type="button" aria-label="Make hills harder">+</button>
+    </div>
+    <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info</button>
+    <button id="btn-log" type="button" title="Ride history stored locally">Log</button>
+  </div>
+
+  <aside id="ride-log" hidden aria-label="Ride log"></aside>
+  <div id="credit"></div>
+
+  <dialog id="bt-modal" aria-labelledby="bt-modal-title">
+    <h3 id="bt-modal-title">Select Smart Trainer</h3>
+    <p class="bt-sub">Scanning for nearby Bluetooth Cycling Power / FTMS trainers…</p>
+    <ul id="bt-device-list"></ul>
+    <div class="bt-actions">
+      <button id="bt-cancel" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <div id="loading">Building the valley…</div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
