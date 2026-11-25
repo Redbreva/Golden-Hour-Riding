@@ -23,14 +23,11 @@ const winterMode = Boolean(activeCourseDef.winter);
 const sceneryParam = params.get('scenery');
 const sceneryMode = sceneryParam !== null;
 
-const hasHiDpi = (window.devicePixelRatio || 1) > 1.05;
-const RES_MODES = hasHiDpi ? ['0.75x', '1x', 'retina'] : ['0.75x', '1x'];
+const RES_MODES = ['1x', '0.75x'];
 let resMode = localStorage.getItem('ghr_res') || '1x';
 if (!RES_MODES.includes(resMode)) resMode = '1x';
 function getActivePixelRatio() {
-  if (resMode === 'retina') return Math.min(window.devicePixelRatio, 2);
-  if (resMode === '0.75x') return 0.75;
-  return 1;
+  return resMode === '0.75x' ? 0.75 : 1;
 }
 
 const canvas = $('scene-canvas');
@@ -277,9 +274,9 @@ window.addEventListener('keydown', (e) => {
 
 const resBtn = $('btn-res');
 function updateResButton() {
-  const label = resMode === 'retina' ? 'Retina' : resMode === '0.75x' ? '0.75×' : '1×';
-  resBtn.textContent = `Res: ${label}`;
-  resBtn.classList.toggle('on', resMode === 'retina');
+  const isFast = resMode === '0.75x';
+  resBtn.textContent = isFast ? 'Res: 0.75×' : 'Res: 1×';
+  resBtn.classList.toggle('on', isFast);
 }
 function toggleResolution() {
   const nextIdx = (RES_MODES.indexOf(resMode) + 1) % RES_MODES.length;

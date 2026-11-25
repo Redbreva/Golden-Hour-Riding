@@ -23,17 +23,21 @@ export function createRideState() {
 
 export function stepRidePhysics(state, dt, course, pose, probe, sceneryMode) {
   state.power += (state.targetPower - state.power) * Math.min(1, dt * 3);
+  if (state.targetPower === 0 && state.power < 0.5) state.power = 0;
   course.samplePose(state.s, pose);
 
   const v = state.v;
   const slope = pose.t.y > 0 ? pose.t.y : pose.t.y * 0.5;
   const brakeForce = v > 15 ? RIDER_MASS_KG * 0.5 * (v - 15) : 0;
-  const driveForce = state.power / Math.max(v, 2);
+  // Allow realistic low-gear torque from a standstill so riders can start on steep climbs
+  const driveForce = state.power > 0.5 ? state.power / Math.max(v, 0.6) : 0;
   const gravityAndRoll = RIDER_MASS_KG * GRAVITY * (slope + ROLLING_RESISTANCE);
   const aeroDrag = 0.5 * AIR_DENSITY * CDA * v * v;
 
   const netForce = driveForce - gravityAndRoll - aeroDrag - brakeForce;
-  state.v = Math.max(0.5, v + (netForce / RIDER_MASS_KG) * dt);
+  const nextV = Math.max(0, v + (netForce / RIDER_MASS_KG) * dt);
+  // Hold stationary at 0 W once stopped (don't creep/drift before pedaling starts)
+  state.v = state.power < 1 && v < 0.05 && nextV < 0.2 ? 0 : nextV;
 
   if (sceneryMode) {
     // Gentle ~18 km/h cruise in autopilot scenery mode
