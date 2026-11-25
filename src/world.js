@@ -9,6 +9,7 @@ import {
   buildWetRoughnessTexture,
   makeRepeatingTexture,
 } from './textures.js';
+import { buildSideRoads } from './junctions.js';
 
 const V3 = THREE.Vector3;
 
@@ -281,6 +282,8 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
     scene.add(m);
   }
 
+  buildSideRoads(scene, course, images, maxAniso, winterMode);
+
   /* ---------- 2b. Roadside wooden verge posts & wildflowers for foreground parallax ---------- */
   {
     const m4 = new THREE.Matrix4();
@@ -299,6 +302,7 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const off = side * (4.15 + rng() * 0.25);
         const x = P[i].x + R[i].x * off;
         const z = P[i].z + R[i].z * off;
+        if (course.isOnSideRoad(x, z, 2.5)) continue;
         const y = P[i].y - 0.14;
         postPositions.push([x, y, z, rng() * 0.12 - 0.06]);
       }
@@ -339,6 +343,11 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const j = (rng() - 0.5) * 1.5;
         const x = P[i].x + R[i].x * side * d + T[i].x * j;
         const z = P[i].z + R[i].z * side * d + T[i].z * j;
+        if (course.isOnSideRoad(x, z, 1.5)) {
+          flowers.setMatrixAt(k, m4.makeScale(0, 0, 0));
+          flowers.setColorAt(k, c.setRGB(1, 1, 1));
+          continue;
+        }
         let y = course.meshElevation(x, z);
         if (d < 6.8) y = Math.max(y, P[i].y + T[i].y * j - (0.72 * (d - 3.5)) / 3.3);
         const s = 0.65 + rng() * 1.1;
@@ -567,6 +576,11 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const j = (rng() - 0.5) * 1.5;
         const x = P[i].x + R[i].x * side * d + T[i].x * j;
         const z = P[i].z + R[i].z * side * d + T[i].z * j;
+        if (course.isOnSideRoad(x, z, 2.0)) {
+          mesh.setMatrixAt(k, m4.makeScale(0, 0, 0));
+          mesh.setColorAt(k, c.setRGB(0.5, 0.5, 0.5));
+          continue;
+        }
         let y = course.meshElevation(x, z);
         if (d < 6.8) y = Math.max(y, P[i].y + T[i].y * j - (0.72 * (d - 3.5)) / 3.3);
         const tall = 0.28 + rng() * 0.5 + (d > 5 ? rng() * 0.25 : 0);
@@ -591,13 +605,18 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
   if (!winterMode) {
     const fieldData = new Float32Array(TW * TW * 4);
     for (let k = 0; k < TW * TW; k++) {
-      const nr = course.nearestRoad(tPos[k * 3], tPos[k * 3 + 2]);
+      const wx = tPos[k * 3];
+      const wz = tPos[k * 3 + 2];
+      const nr = course.nearestRoad(wx, wz);
+      const sr = course.nearestSideRoad(wx, wz);
+      let roadDist = nr ? Math.min(nr.d, 100) : 100;
+      if (sr) roadDist = Math.min(roadDist, Math.max(0, sr.d - sr.halfWidth - 2.5));
       fieldData.set(
         [
           H[k],
-          nr ? Math.min(nr.d, 100) : 100,
+          roadDist,
           Math.max(tMix[k * 2], tMix[k * 2 + 1]),
-          smoothstep(0.3, 0.7, fbm(tPos[k * 3] / 45, tPos[k * 3 + 2] / 45, 3)),
+          smoothstep(0.3, 0.7, fbm(wx / 45, wz / 45, 3)),
         ],
         k * 4
       );
@@ -1086,6 +1105,7 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
     for (const [x1, z1, x2, z2, kind] of lines) {
       const mx = (x1 + x2) / 2;
       const mz = (z1 + z2) / 2;
+      if (course.isOnSideRoad(mx, mz, 1.5)) continue;
       const segLen = Math.hypot(x2 - x1, z2 - z1);
       q.setFromAxisAngle(up, -Math.atan2(z2 - z1, x2 - x1));
       const scale = kind

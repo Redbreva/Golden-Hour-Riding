@@ -100,11 +100,11 @@ export function createPostProcessing(renderer, scene, camera, hazeLum) {
       }
       void main(){
         vec2 c = vUv - 0.5; float r2 = dot(c, c);
-        vec2 dir = c * r2 * (0.02 + 0.2 * uSpeed);
+        vec2 dir = c * r2 * (0.005 + 0.04 * uSpeed);
         vec3 dr = uRain > 0.01 ? drops(vUv, uTime) * uRain : vec3(0.);
         vec2 uv0 = vUv + dr.xy;
         vec3 col = vec3(0.);
-        if (uSpeed < 0.15) {
+        if (uSpeed < 0.25) {
           col = texture2D(tDiffuse, uv0).rgb;
         } else {
           for (int i = 0; i < 5; i++) col += texture2D(tDiffuse, uv0 - dir * (float(i) / 4.)).rgb;

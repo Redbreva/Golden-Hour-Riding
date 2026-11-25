@@ -295,6 +295,16 @@ const isCleanMode = () => document.body.classList.contains('clean');
 $('power-slider').addEventListener('input', (e) => {
   setTargetPower(+e.target.value);
 });
+const pauseBtn = $('btn-pause');
+let paused = false;
+function setPaused(p) {
+  paused = Boolean(p);
+  pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  pauseBtn.classList.toggle('on', paused);
+  $('status-paused').hidden = !paused;
+}
+pauseBtn.addEventListener('click', () => setPaused(!paused));
+
 $('btn-back').addEventListener('click', () => skipDistance(-250));
 $('btn-skip').addEventListener('click', () => skipDistance(250));
 $('btn-clean').addEventListener('click', (e) => {
@@ -363,6 +373,11 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (isCleanMode()) setCleanMode(false);
     else setMenuOpen(menuDrawer.hidden);
+    return;
+  }
+  if (e.code === 'Space' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    e.preventDefault();
+    setPaused(!paused);
     return;
   }
   if (e.key === 'ArrowUp') setTargetPower(state.targetPower + 10);
@@ -497,9 +512,12 @@ function animate() {
   }
 
   if (!switchingCourse) {
-    stepRidePhysics(state, dt, course, pose, probe, sceneryMode);
+    const simDt = paused ? 0 : dt;
+    if (!paused) {
+      stepRidePhysics(state, dt, course, pose, probe, sceneryMode);
+    }
 
-    if (sceneryMode) {
+    if (sceneryMode && !paused) {
       sceneryElapsed += dt;
       if (sceneryElapsed >= sceneryPlan[sceneryIndex][1]) {
         sceneryElapsed = 0;
@@ -517,7 +535,13 @@ function animate() {
     const sway = Math.sin(state.pedalPhase);
     camera.position.copy(pose.p).addScaledVector(pose.r, LANE_OFFSET + sway * 0.004 * effort);
     camera.position.y += 1.52;
-    lookTarget.copy(ahead.p).addScaledVector(ahead.r, LANE_OFFSET);
+    // Safe forward look: prevents the camera from flipping backwards at tight 180° turnarounds
+    lookTarget.copy(pose.p).addScaledVector(pose.r, LANE_OFFSET).addScaledVector(pose.t, 9);
+    const aheadDelta = probe.p.copy(ahead.p).addScaledVector(ahead.r, LANE_OFFSET).sub(pose.p);
+    const aheadDist = aheadDelta.length();
+    if (aheadDist > 2 && aheadDelta.dot(pose.t) / aheadDist > 0.35) {
+      lookTarget.lerp(probe.p.copy(ahead.p).addScaledVector(ahead.r, LANE_OFFSET), 0.75);
+    }
     lookTarget.y += 0.3;
     camera.lookAt(lookTarget);
     camera.rotateZ(-state.lean);
@@ -529,7 +553,7 @@ function animate() {
     }
 
     weather.stepWeather(dt, sceneryMode, world.terrainMat, world.roadMat);
-    weather.rainUniforms.uVel.value.copy(pose.t).multiplyScalar(state.v);
+    weather.rainUniforms.uVel.value.copy(pose.t).multiplyScalar(paused ? 0 : state.v);
 
     // Move shadow frustum with the rider
     weather.sun.target.position.copy(pose.p).addScaledVector(pose.t, 70);
@@ -544,13 +568,13 @@ function animate() {
       0.25 * weather.current.rays * smoothstep(0.1, 0.6, camera.getWorldDirection(fwdDir).dot(weather.sunDir));
     postfx.rays.uniforms.uAmt.value = raysAmt;
     postfx.rays.enabled = raysAmt > 0.005;
-    postfx.lens.uniforms.uSpeed.value = Math.min(1, state.v / 22);
+    postfx.lens.uniforms.uSpeed.value = paused ? 0 : Math.min(1, state.v / 22);
     postfx.lens.uniforms.uTime.value = uniforms.uTime.value;
     postfx.lens.uniforms.uRain.value = weather.current.rain;
     postfx.lens.uniforms.uPaint.value = weather.current.paint;
 
-    audio.update(state.v, weather.current.rain);
-    cockpit.spinWheel(state.v, dt);
+    audio.update(paused ? 0 : state.v, weather.current.rain);
+    cockpit.spinWheel(state.v, simDt);
 
     hudTimer -= dt;
     if (hudTimer <= 0) {

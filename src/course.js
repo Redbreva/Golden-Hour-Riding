@@ -23,7 +23,8 @@ export async function loadRealCourseData(courseId) {
   if (!data) throw new Error(`Course "${courseId}" did not register on window.RIDE_COURSES`);
   if (data._prepared) return data;
 
-  data.osm = data.osm || { buildings: [], trees: [], lines: [], woods: '', credit: '' };
+  data.osm = data.osm || { buildings: [], trees: [], lines: [], woods: '', sideRoads: [], credit: '' };
+  data.osm.sideRoads = data.osm.sideRoads || [];
 
   const woodBytes = data.osm.woods
     ? Uint8Array.from(atob(data.osm.woods), (c) => c.charCodeAt(0))
@@ -65,7 +66,8 @@ export function createCourse(sunFlat, real = null) {
     }
   }
 
-  const curve = new THREE.CatmullRomCurve3(controlPoints, true, 'centripetal');
+  const closed = real ? real.closed !== false : true;
+  const curve = new THREE.CatmullRomCurve3(controlPoints, closed, 'centripetal');
   curve.arcLengthDivisions = Math.max(4000, controlPoints.length * 12);
   const length = curve.getLength();
   const sampleCount = Math.floor(length / 1.5);
@@ -131,6 +133,59 @@ export function createCourse(sunFlat, real = null) {
     nearScratch.y = points[bestIdx].y + tangents[bestIdx].y * (ex * tangents[bestIdx].x + ez * tangents[bestIdx].z);
     nearScratch.side = ex * rights[bestIdx].x + ez * rights[bestIdx].z;
     return nearScratch;
+  }
+
+  // Spatial index for intersecting side roads (T-junctions, crossroads, lanes)
+  const sideRoads = real?.osm?.sideRoads || [];
+  const sideSegs = [];
+  for (const sr of sideRoads) {
+    const pts = sr.points;
+    if (!pts || pts.length < 2) continue;
+    const hw = (sr.width || 5.2) * 0.5;
+    // Bridge pts[0] back to nearest main-road point so junction mouths always clear grass/hedges
+    const nr0 = nearestRoad(pts[0][0], pts[0][1]);
+    const fullPts =
+      nr0 && nr0.d > 2.0 && nr0.d < 14.0
+        ? [[points[nr0.i].x, points[nr0.i].z], ...pts]
+        : pts;
+    for (let i = 0; i < fullPts.length - 1; i++) {
+      const [ax, az] = fullPts[i];
+      const [bx, bz] = fullPts[i + 1];
+      // Widen clearance slightly at the first 2 segments to cover the flared bellmouth
+      const segHw = i < 2 ? hw * 1.45 : hw;
+      sideSegs.push({
+        ax, az, bx, bz, hw: segHw,
+        minX: Math.min(ax, bx) - segHw - 6,
+        maxX: Math.max(ax, bx) + segHw + 6,
+        minZ: Math.min(az, bz) - segHw - 6,
+        maxZ: Math.max(az, bz) + segHw + 6,
+      });
+    }
+  }
+
+  function nearestSideRoad(x, z) {
+    if (!sideSegs.length) return null;
+    let bestD = Infinity;
+    let bestHw = 0;
+    for (let i = 0; i < sideSegs.length; i++) {
+      const s = sideSegs[i];
+      if (x < s.minX || x > s.maxX || z < s.minZ || z > s.maxZ) continue;
+      const dx = s.bx - s.ax;
+      const dz = s.bz - s.az;
+      const lenSq = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - s.ax) * dx + (z - s.az) * dz) / lenSq));
+      const d = Math.hypot(x - (s.ax + dx * t), z - (s.az + dz * t));
+      if (d < bestD) {
+        bestD = d;
+        bestHw = s.hw;
+      }
+    }
+    return bestD < Infinity ? { d: bestD, halfWidth: bestHw } : null;
+  }
+
+  function isOnSideRoad(x, z, margin = 1.0) {
+    const sr = nearestSideRoad(x, z);
+    return sr ? sr.d < sr.halfWidth + margin : false;
   }
 
   function demElevation(x, z) {
@@ -206,7 +261,9 @@ export function createCourse(sunFlat, real = null) {
 
   return {
     real,
-    startDistance: real ? 850 : 0,
+    closed,
+    sideRoads,
+    startDistance: real ? (real.startDistance ?? 850) : 0,
     length,
     sampleCount,
     points,
@@ -219,6 +276,8 @@ export function createCourse(sunFlat, real = null) {
     heights,
     samplePose,
     nearestRoad,
+    nearestSideRoad,
+    isOnSideRoad,
     demElevation,
     meshElevation,
   };
