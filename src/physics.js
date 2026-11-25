@@ -44,8 +44,19 @@ export function stepRidePhysics(state, dt, course, pose, probe, sceneryMode) {
     state.v = v + (5 - v) * Math.min(1, dt);
   }
 
-  state.s = (state.s + state.v * dt) % course.length;
-  state.distance += state.v * dt;
+  if (course.closed === false) {
+    const nextS = state.s + state.v * dt;
+    if (nextS >= course.length - 12) {
+      state.s = course.length - 12;
+      state.v = 0;
+    } else {
+      state.s = nextS;
+      state.distance += state.v * dt;
+    }
+  } else {
+    state.s = (state.s + state.v * dt) % course.length;
+    state.distance += state.v * dt;
+  }
   state.grade += (pose.t.y * 100 - state.grade) * Math.min(1, dt * 2);
 
   // Corner curvature for bike lean

@@ -65,6 +65,9 @@
         </summary>
         <div class="acc-body">
           <div id="course-list" class="course-list"></div>
+          <div class="btn-row">
+            <button id="btn-import-route" type="button" class="btn-import" title="Import a personal GPX, FIT, or TCX cycling route">+ Import Route (GPX / FIT / TCX)</button>
+          </div>
         </div>
       </details>
 
@@ -93,7 +96,10 @@
             <button id="btn-fps" type="button" title="Toggle FPS overlay (F key)">FPS: off</button>
           </div>
           <div class="btn-row">
+            <button id="btn-map" type="button" class="on" title="Toggle route mini-map overlay (N key)">Map: on</button>
             <button id="btn-voice" type="button" title="Native offline voice commands: golden, sunset, overcast, rain, mist, starry, snow, light on/off, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
+          </div>
+          <div class="btn-row">
             <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info (H)</button>
           </div>
         </div>
@@ -111,6 +117,7 @@
     </div>
   </aside>
 
+  <canvas id="route-minimap" aria-label="Route overview map"></canvas>
   <div id="fps-badge" hidden aria-hidden="true">-- FPS</div>
   <div id="credit"></div>
 
@@ -120,6 +127,16 @@
     <ul id="bt-device-list"></ul>
     <div class="bt-actions">
       <button id="bt-cancel" type="button">Cancel</button>
+    </div>
+  </dialog>
+
+  <dialog id="import-modal" aria-labelledby="import-modal-title">
+    <h3 id="import-modal-title">Importing Route</h3>
+    <p id="import-status" class="bt-sub">Preparing route…</p>
+    <div class="import-bar"><div class="import-bar-fill"></div></div>
+    <div id="import-error" class="import-error" hidden></div>
+    <div class="bt-actions">
+      <button id="import-close" type="button" hidden>Close</button>
     </div>
   </dialog>
 

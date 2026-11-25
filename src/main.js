@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { smoothstep } from './noise.js';
 import { loadSurfaceImages } from './textures.js';
-import { COURSES, getCourseById, resolveCourseFromSearch } from './courses.js';
-import { createCourse, loadRealCourseData } from './course.js';
+import { getAllCourses, getCourseById, resolveCourseFromSearch, setPersonalCourses } from './courses.js';
+import { createCourse, loadPersonalCourseData, loadRealCourseData } from './course.js';
 import { createWeatherSystem } from './weather.js';
 import { buildWorld } from './world.js';
 import { createCockpit } from './cockpit.js';
@@ -12,9 +12,19 @@ import { createAudioEngine } from './audio.js';
 import { createTrainerController } from './trainer.js';
 import { initVoiceControl } from './voice.js';
 import { initRideLog } from './log.js';
+import { createMiniMap } from './minimap.js';
 
 const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
+
+// Load saved personal courses before resolving URL course
+if (window.electronCourses) {
+  try {
+    setPersonalCourses(await window.electronCourses.list());
+  } catch (err) {
+    console.warn('Could not load personal courses:', err);
+  }
+}
 
 const params = new URLSearchParams(window.location.search);
 let activeCourseDef = resolveCourseFromSearch(window.location.search);
@@ -116,6 +126,9 @@ let realData = null;
 if (activeCourseDef.type === 'real') {
   realData = await loadRealCourseData(activeCourseDef.dataId || activeCourseDef.id);
   $('credit').textContent = realData.creditText;
+} else if (activeCourseDef.type === 'personal') {
+  realData = await loadPersonalCourseData(activeCourseDef.id);
+  $('credit').textContent = realData.creditText;
 } else {
   $('credit').textContent = '';
 }
@@ -126,6 +139,8 @@ let world = buildWorld(scene, course, weather, images, maxAniso, uniforms, winte
 const cockpit = createCockpit(camera);
 const postfx = createPostProcessing(renderer, scene, camera, weather.hazeLum);
 const audio = createAudioEngine();
+const minimap = createMiniMap($('route-minimap'));
+minimap.setCourse(course);
 
 const state = createRideState();
 state.s = activeCourseDef.startDistance ?? course.startDistance;
@@ -166,13 +181,19 @@ function renderCourseList() {
   $('drawer-course-sub').textContent = activeCourseDef.name;
   const accCourseVal = $('acc-course-val');
   if (accCourseVal) accCourseVal.textContent = activeCourseDef.shortName;
-  list.innerHTML = COURSES.map(
-    (c) =>
-      `<button type="button" class="course-card${c.id === activeCourseDef.id ? ' active' : ''}" data-course-id="${c.id}">` +
-      `<div class="course-card-head"><span class="course-card-name">${c.name}</span><span class="course-badge">${c.badge}</span></div>` +
-      `<div class="course-card-sub">${c.subtitle}</div>` +
-      `</button>`
-  ).join('');
+  list.innerHTML = getAllCourses()
+    .map((c) => {
+      const cardHtml =
+        `<button type="button" class="course-card${c.id === activeCourseDef.id ? ' active' : ''}" data-course-id="${c.id}">` +
+        `<div class="course-card-head"><span class="course-card-name">${c.name}</span><span class="course-badge">${c.badge}</span></div>` +
+        `<div class="course-card-sub">${c.subtitle}</div>` +
+        `</button>`;
+      if (c.type === 'personal') {
+        return `<div class="course-card-wrap">${cardHtml}<button type="button" class="course-del-btn" data-delete-id="${c.id}" title="Delete imported route" aria-label="Delete ${c.name}">✕</button></div>`;
+      }
+      return cardHtml;
+    })
+    .join('');
 
   list.querySelectorAll('.course-card').forEach((card) => {
     card.addEventListener('click', () => {
@@ -184,6 +205,73 @@ function renderCourseList() {
       switchCourse(targetId);
     });
   });
+
+  list.querySelectorAll('.course-del-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const delId = btn.dataset.deleteId;
+      const target = getCourseById(delId);
+      if (!target || !window.confirm(`Delete imported route "${target.name}"?`)) return;
+      if (window.electronCourses) {
+        const updated = await window.electronCourses.deleteCourse(delId);
+        setPersonalCourses(updated);
+        if (activeCourseDef.id === delId) {
+          await switchCourse('valley');
+        } else {
+          renderCourseList();
+        }
+      }
+    });
+  });
+}
+
+// Import personal GPX / FIT / TCX route
+const importBtn = $('btn-import-route');
+const importModal = $('import-modal');
+const importStatus = $('import-status');
+const importError = $('import-error');
+const importClose = $('import-close');
+
+if (window.electronCourses) {
+  window.electronCourses.onImportProgress(({ message }) => {
+    importStatus.textContent = message;
+  });
+  importClose.addEventListener('click', () => importModal.close());
+  importBtn.addEventListener('click', async () => {
+    importError.hidden = true;
+    importClose.hidden = true;
+    importStatus.textContent = 'Select a .gpx, .fit, or .tcx file…';
+    importModal.querySelector('.import-bar').hidden = false;
+    importModal.showModal();
+    try {
+      const res = await window.electronCourses.importRoute();
+      if (res.canceled) {
+        importModal.close();
+        return;
+      }
+      if (res.error) {
+        importStatus.textContent = 'Import failed';
+        importError.textContent = res.error;
+        importError.hidden = false;
+        importClose.hidden = false;
+        importModal.querySelector('.import-bar').hidden = true;
+        return;
+      }
+      const updated = await window.electronCourses.list();
+      setPersonalCourses(updated);
+      renderCourseList();
+      importModal.close();
+      await switchCourse(res.course.id);
+    } catch (err) {
+      importStatus.textContent = 'Import failed';
+      importError.textContent = err.message || String(err);
+      importError.hidden = false;
+      importClose.hidden = false;
+      importModal.querySelector('.import-bar').hidden = true;
+    }
+  });
+} else {
+  importBtn.hidden = true;
 }
 
 function disposeCurrentScene() {
@@ -224,6 +312,8 @@ async function switchCourse(targetId) {
     let nextRealData = null;
     if (nextDef.type === 'real') {
       nextRealData = await loadRealCourseData(nextDef.dataId || nextDef.id);
+    } else if (nextDef.type === 'personal') {
+      nextRealData = await loadPersonalCourseData(nextDef.id);
     }
 
     disposeCurrentScene();
@@ -253,6 +343,7 @@ async function switchCourse(targetId) {
     }
 
     rideLog.setCourse(courseId);
+    minimap.setCourse(course);
     renderCourseList();
     renderWeatherGrid();
 
@@ -369,6 +460,16 @@ function toggleFps() {
 }
 fpsBtn.addEventListener('click', toggleFps);
 
+const mapBtn = $('btn-map');
+function toggleMiniMap() {
+  const el = $('route-minimap');
+  el.hidden = !el.hidden;
+  const visible = !el.hidden;
+  mapBtn.textContent = visible ? 'Map: on' : 'Map: off';
+  mapBtn.classList.toggle('on', visible);
+}
+mapBtn.addEventListener('click', toggleMiniMap);
+
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     if (isCleanMode()) setCleanMode(false);
@@ -395,6 +496,9 @@ window.addEventListener('keydown', (e) => {
   }
   if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
     toggleFps();
+  }
+  if ((e.key === 'n' || e.key === 'N') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleMiniMap();
   }
   if ((e.key === 'q' || e.key === 'Q') && !e.metaKey && !e.ctrlKey && !e.altKey) {
     toggleResolution();
@@ -580,6 +684,7 @@ function animate() {
     if (hudTimer <= 0) {
       hudTimer = 0.25;
       cockpit.drawHeadUnit(state.v * 3.6, state.power, state.grade);
+      minimap.update(pose, state.s);
       $('hud-power').textContent = state.power.toFixed(0);
       $('hud-speed').textContent = (state.v * 3.6).toFixed(1);
       $('hud-grade').textContent = `${state.grade >= 0 ? '+' : ''}${state.grade.toFixed(1)}`;

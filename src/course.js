@@ -13,14 +13,8 @@ function loadScript(src) {
   });
 }
 
-export async function loadRealCourseData(courseId) {
-  if (!window.RIDE_COURSES?.[courseId]) {
-    await loadScript(`./assets/${courseId}.js`);
-    await loadScript(`./assets/${courseId}_osm.js`).catch(() => {});
-  }
-
-  const data = window.RIDE_COURSES?.[courseId];
-  if (!data) throw new Error(`Course "${courseId}" did not register on window.RIDE_COURSES`);
+export function prepareRealCourseData(data) {
+  if (!data) throw new Error('Missing course data');
   if (data._prepared) return data;
 
   data.osm = data.osm || { buildings: [], trees: [], lines: [], woods: '', sideRoads: [], credit: '' };
@@ -50,6 +44,23 @@ export async function loadRealCourseData(courseId) {
   data._prepared = true;
 
   return data;
+}
+
+export async function loadRealCourseData(courseId) {
+  if (!window.RIDE_COURSES?.[courseId]) {
+    await loadScript(`./assets/${courseId}.js`);
+    await loadScript(`./assets/${courseId}_osm.js`).catch(() => {});
+  }
+
+  const data = window.RIDE_COURSES?.[courseId];
+  if (!data) throw new Error(`Course "${courseId}" did not register on window.RIDE_COURSES`);
+  return prepareRealCourseData(data);
+}
+
+export async function loadPersonalCourseData(courseId) {
+  if (!window.electronCourses) throw new Error('Personal courses are only available in the desktop app.');
+  const raw = await window.electronCourses.load(courseId);
+  return prepareRealCourseData(raw);
 }
 
 export function createCourse(sunFlat, real = null) {
@@ -104,12 +115,13 @@ export function createCourse(sunFlat, real = null) {
     bucket.push(idx);
   });
 
-  const nearScratch = { d: 0, y: 0, i: 0, side: 0 };
+  const nearScratch = { d: 0, y: 0, minY: 0, i: 0, side: 0 };
   function nearestRoad(x, z) {
     const cx = Math.floor(x / cellSize);
     const cz = Math.floor(z / cellSize);
     let bestDistSq = 1e12;
     let bestIdx = -1;
+    let minNearY = Infinity;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
         const arr = grid.get(cellKey(cx + dx, cz + dz));
@@ -122,6 +134,9 @@ export function createCourse(sunFlat, real = null) {
             bestDistSq = d2;
             bestIdx = i;
           }
+          if (d2 < 22 * 22 && points[i].y < minNearY) {
+            minNearY = points[i].y;
+          }
         }
       }
     }
@@ -131,6 +146,7 @@ export function createCourse(sunFlat, real = null) {
     nearScratch.d = Math.sqrt(bestDistSq);
     nearScratch.i = bestIdx;
     nearScratch.y = points[bestIdx].y + tangents[bestIdx].y * (ex * tangents[bestIdx].x + ez * tangents[bestIdx].z);
+    nearScratch.minY = minNearY < Infinity ? Math.min(nearScratch.y, minNearY) : nearScratch.y;
     nearScratch.side = ex * rights[bestIdx].x + ez * rights[bestIdx].z;
     return nearScratch;
   }
@@ -143,7 +159,7 @@ export function createCourse(sunFlat, real = null) {
     if (!pts || pts.length < 2) continue;
     const hw = (sr.width || 5.2) * 0.5;
     // Bridge pts[0] back to nearest main-road point so junction mouths always clear grass/hedges
-    const nr0 = nearestRoad(pts[0][0], pts[0][1]);
+    const nr0 = sr.kind === 'roundabout' ? null : nearestRoad(pts[0][0], pts[0][1]);
     const fullPts =
       nr0 && nr0.d > 2.0 && nr0.d < 14.0
         ? [[points[nr0.i].x, points[nr0.i].z], ...pts]
@@ -225,8 +241,10 @@ export function createCourse(sunFlat, real = null) {
     const base = baseElevation(x, z);
     const nr = nearestRoad(x, z);
     if (!nr) return base;
-    const blend = real ? smoothstep(6, 34, nr.d) : smoothstep(9, 62, nr.d);
-    return (nr.y - 0.6) * (1 - blend) + base * blend;
+    // Use minY when close to converging/merging road legs so terrain never bridges across the lower leg
+    const roadRefY = nr.d < 16 ? nr.minY : nr.y;
+    const blend = real ? smoothstep(8, 36, nr.d) : smoothstep(9, 62, nr.d);
+    return (roadRefY - 0.85) * (1 - blend) + base * blend;
   }
 
   const terrainSize = real ? real.size : 3200;

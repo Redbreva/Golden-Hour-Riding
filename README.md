@@ -6,10 +6,13 @@ Inspired by [Jamie WP's Golden Hour Ride](https://golden-hour-ride.space.fast/) 
 
 ## Features
 
-- **Course Selector**:
+- **Course Selector & Personal Route Importer**:
   - **Alpine Valley**: Procedurally generated mountain valley loop with pine forests, rolling meadows, moving clouds, and golden-hour sunlight.
   - **Alpine Valley — Christmas**: Snowy dusk edition with glowing timber chalets, fairy-lit pines, and falling snow.
-  - **Leckhampton Hill**: Real-world Cotswold climb built from Environment Agency terrain elevation (DEM) and OpenStreetMap data, with broadleaf trees, sheep flocks, hay stooks, hedges, dry-stone walls, and quarry smoke.
+  - **Leckhampton Hill**: Real-world Cotswold climb built from Environment Agency terrain elevation (DEM) and OpenStreetMap data, with 3D buildings, broadleaf trees, sheep flocks, hay stooks, hedges, dry-stone walls, quarry smoke, and real intersecting side roads.
+  - **Import Your Own Routes (`.gpx`, `.fit`, `.tcx`)**: Open **`☰ Menu` → `Course` → `+ Import Route`** to convert any personal cycling route directly inside the app — fetches free global AWS Terrain Tiles for surrounding hills and OpenStreetMap buildings, woodland, hedges, roundabouts, and intersecting junctions with UK Give Way markings and street signposts.
+  - **Zero-reload course switching**: Switch courses without dropping your live Bluetooth smart trainer connection.
+- **2D Route Mini-Map**: Bottom-right route overview showing side roads, travelled trail, live rider heading cone, and distance progress (`N` key to toggle).
 - **Weather System**: Smooth transitions between **Golden**, **Deep Sunset**, **Overcast**, **Rain** (rain streaks, wet tarmac ripples, lens raindrops, rain audio), **Mist**, **Starry Night**, and **Snow** (`1`–`6` keys or **Weather ▾** dropdown).
 - **Cycling Physics & Cockpit**: First-person road bike handlebars with live head unit (`KM/H` & `WATTS`), toggleable bike headlight (`L` key or **Light** button), power-to-speed physics (gravity, rolling resistance, aerodynamic drag), corner lean, pedal sway, and speed-sensitive FOV.
 - **Bluetooth Smart Trainer Support (BLE)**: In-app Bluetooth trainer picker connecting to `Cycling Power` (0x1818) and `Fitness Machine Service / FTMS` (0x1826) trainers for live watts and gradient simulation, with `0%–100%` hill scaling.
@@ -47,12 +50,14 @@ npm run dist:win
 | `↑` / `↓` or Power slider | Adjust target power (watts) |
 | `→` / `←` or Skip button | Jump 250 m forward / backward |
 | `1` – `6` | Switch weather (Golden, Deep Sunset, Overcast, Rain, Mist, Starry) |
+| `Space` or Pause button | Pause / resume ride |
+| `N` or Map button | Toggle 2D route mini-map overlay |
 | `L` or Light button | Toggle bike headlight |
 | `Q` or Res button | Toggle render resolution (`1×` vs `0.75×` fast mode) |
 | `M` or Sound button | Mute / unmute audio |
-| `F` | Toggle FPS & frame-time overlay |
+| `F` | Toggle FPS overlay |
 | `H` or Hide info | Toggle clean view (click or press `H` to restore) |
-| **Course ▾** / **Weather ▾** | Open course or weather selector panels |
+| `Esc` or **`☰ Menu`** | Open / close the collapsible controls drawer |
 | `−` / `+` Hills | Adjust smart trainer gradient scaling (`0%–100%`) |
 
 ## Adding New Courses

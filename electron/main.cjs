@@ -1,6 +1,12 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, session } = require('electron');
 const path = require('path');
 const { createVoiceService } = require('./voice-service.cjs');
+const {
+  importRouteFile,
+  listPersonalCourses,
+  loadPersonalCourseData,
+  deletePersonalCourse,
+} = require('./route-importer.cjs');
 
 // Enable Web Bluetooth and immediate desktop audio in Electron's Chromium runtime
 app.commandLine.appendSwitch('enable-experimental-web-platform-features');
@@ -70,6 +76,41 @@ ipcMain.on('bt:select-device', (_event, deviceId) => {
     const cb = pendingBtCallback;
     pendingBtCallback = null;
     cb(deviceId || '');
+  }
+});
+
+// Personal route library & GPX/FIT/TCX importer
+const getCoursesDir = () => path.join(app.getPath('userData'), 'courses');
+
+ipcMain.handle('courses:list', () => listPersonalCourses(getCoursesDir()));
+
+ipcMain.handle('courses:load', (_event, courseId) => loadPersonalCourseData(getCoursesDir(), courseId));
+
+ipcMain.handle('courses:delete', (_event, courseId) => deletePersonalCourse(getCoursesDir(), courseId));
+
+ipcMain.handle('courses:import', async () => {
+  if (!mainWindow) return { canceled: true };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Import Route (GPX, FIT, or TCX)',
+    properties: ['openFile'],
+    filters: [
+      { name: 'Cycling Routes', extensions: ['gpx', 'fit', 'tcx'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || !result.filePaths.length) {
+    return { canceled: true };
+  }
+  const filePath = result.filePaths[0];
+  try {
+    const meta = await importRouteFile(filePath, getCoursesDir(), (message) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('courses:import-progress', { message });
+      }
+    });
+    return { canceled: false, course: meta };
+  } catch (err) {
+    return { canceled: false, error: err.message || String(err) };
   }
 });
 

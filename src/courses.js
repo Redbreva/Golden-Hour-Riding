@@ -38,11 +38,22 @@ export const COURSES = [
   },
 ];
 
+let personalCourses = [];
+
+export function setPersonalCourses(list) {
+  personalCourses = Array.isArray(list) ? list : [];
+}
+
+export function getAllCourses() {
+  return [...COURSES, ...personalCourses];
+}
+
 export function resolveCourseFromSearch(search = window.location.search) {
   const params = new URLSearchParams(search);
   const requestedId = params.get('course');
+  const all = getAllCourses();
   if (requestedId) {
-    const match = COURSES.find((c) => c.id === requestedId);
+    const match = all.find((c) => c.id === requestedId);
     if (match) return match;
   }
   if (params.get('theme') === 'christmas') {
@@ -52,5 +63,5 @@ export function resolveCourseFromSearch(search = window.location.search) {
 }
 
 export function getCourseById(id) {
-  return COURSES.find((c) => c.id === id) || null;
+  return getAllCourses().find((c) => c.id === id) || null;
 }

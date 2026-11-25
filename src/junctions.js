@@ -27,10 +27,11 @@ function resamplePolyline(pts, step = 3.0) {
 
 // Trim a side-road polyline so it starts cleanly at the main road's outer edge (d ≈ edgeDist)
 function trimToMainRoadEdge(pts, course, edgeDist = 3.45) {
-  // If the OSM branch starts slightly outside the main road edge, bridge it back to the main road centerline first
+  // If the OSM branch starts slightly outside the main road edge (e.g. rounded T-junction bend),
+  // bridge it back to the main road centerline so it connects cleanly with no gap
   const nr0 = course.nearestRoad(pts[0][0], pts[0][1]);
   const bridged =
-    nr0 && nr0.d > edgeDist && nr0.d < 14.0
+    nr0 && nr0.d > edgeDist && nr0.d < 24.0
       ? [[course.points[nr0.i].x, course.points[nr0.i].z], ...pts]
       : pts;
 
@@ -216,8 +217,17 @@ export function buildSideRoads(scene, course, images, maxAniso, winterMode) {
   for (const sr of sideRoads) {
     const pts = sr.points;
     if (!pts || pts.length < 2) continue;
+    const isRoundabout = sr.kind === 'roundabout';
     const isPaved = sr.kind !== 'track';
-    const width = sr.width || (isPaved ? 5.2 : 3.2);
+    const width = sr.width || (isRoundabout ? 7.0 : isPaved ? 5.2 : 3.2);
+
+    // Full roundabout rings are kept intact (not trimmed to main road edge) so the full traffic island closes cleanly
+    if (isRoundabout) {
+      const ringPts = resamplePolyline(pts, 2.5);
+      const geo = buildSideRoadGeometry(ringPts, width, course, false);
+      if (geo) pavedGeos.push(geo);
+      continue;
+    }
 
     const trimmed = trimToMainRoadEdge(pts, course, 3.45);
     if (!trimmed) continue;

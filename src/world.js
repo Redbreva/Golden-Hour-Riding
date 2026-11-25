@@ -13,21 +13,31 @@ import { buildSideRoads } from './junctions.js';
 
 const V3 = THREE.Vector3;
 
-function buildRibbonStrip(course, offA, dyA, offB, dyB, uA, uB, vTiles) {
-  const { sampleCount: N, points: P, rights: R } = course;
-  const pos = new Float32Array((N + 1) * 6);
-  const uv = new Float32Array((N + 1) * 4);
-  const idx = new Uint32Array(N * 6);
-  for (let i = 0; i <= N; i++) {
-    const j = i % N;
+function buildRibbonStrip(course, offA, dyA, offB, dyB, uA, uB, vTiles, isShoulder = false) {
+  const { sampleCount: N, points: P, rights: R, closed } = course;
+  const segCount = closed === false ? N - 1 : N;
+  const pos = new Float32Array((segCount + 1) * 6);
+  const uv = new Float32Array((segCount + 1) * 4);
+  const idx = new Uint32Array(segCount * 6);
+  for (let i = 0; i <= segCount; i++) {
+    const j = closed === false ? Math.min(i, N - 1) : i % N;
     const p = P[j];
     const r = R[j];
-    pos.set(
-      [p.x + r.x * offA, p.y + dyA, p.z + r.z * offA, p.x + r.x * offB, p.y + dyB, p.z + r.z * offB],
-      i * 6
-    );
+    const ax = p.x + r.x * offA;
+    const az = p.z + r.z * offA;
+    const bx = p.x + r.x * offB;
+    const bz = p.z + r.z * offB;
+    let ay = p.y + dyA;
+    let by = p.y + dyB;
+    if (isShoulder) {
+      const nrA = course.nearestRoad(ax, az);
+      if ((nrA && nrA.d < 3.4) || course.isOnSideRoad(ax, az, 0.4)) ay -= 0.45;
+      const nrB = course.nearestRoad(bx, bz);
+      if ((nrB && nrB.d < 3.4) || course.isOnSideRoad(bx, bz, 0.4)) by -= 0.45;
+    }
+    pos.set([ax, ay, az, bx, by, bz], i * 6);
     uv.set([uA, (i / N) * vTiles, uB, (i / N) * vTiles], i * 4);
-    if (i < N) idx.set([2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2], i * 6);
+    if (i < segCount) idx.set([2 * i, 2 * i + 1, 2 * i + 2, 2 * i + 1, 2 * i + 3, 2 * i + 2], i * 6);
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -274,8 +284,8 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
     roughness: 1,
   });
   for (const geo of [
-    buildRibbonStrip(course, -6.8, -0.72, -3.5, 0.005, 1, 0, LEN / 5),
-    buildRibbonStrip(course, 3.5, 0.005, 6.8, -0.72, 0, 1, LEN / 5),
+    buildRibbonStrip(course, -6.8, -0.72, -3.5, -0.025, 1, 0, LEN / 5, true),
+    buildRibbonStrip(course, 3.5, -0.025, 6.8, -0.72, 0, 1, LEN / 5, true),
   ]) {
     const m = new THREE.Mesh(geo, shoulderMat);
     m.receiveShadow = true;
@@ -302,7 +312,8 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const off = side * (4.15 + rng() * 0.25);
         const x = P[i].x + R[i].x * off;
         const z = P[i].z + R[i].z * off;
-        if (course.isOnSideRoad(x, z, 2.5)) continue;
+        const nrP = course.nearestRoad(x, z);
+        if ((nrP && nrP.d < 4.1) || course.isOnSideRoad(x, z, 2.5)) continue;
         const y = P[i].y - 0.14;
         postPositions.push([x, y, z, rng() * 0.12 - 0.06]);
       }
@@ -343,13 +354,13 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const j = (rng() - 0.5) * 1.5;
         const x = P[i].x + R[i].x * side * d + T[i].x * j;
         const z = P[i].z + R[i].z * side * d + T[i].z * j;
-        if (course.isOnSideRoad(x, z, 1.5)) {
+        const nrF = course.nearestRoad(x, z);
+        if ((nrF && nrF.d < 3.9) || course.isOnSideRoad(x, z, 1.5)) {
           flowers.setMatrixAt(k, m4.makeScale(0, 0, 0));
           flowers.setColorAt(k, c.setRGB(1, 1, 1));
           continue;
         }
-        let y = course.meshElevation(x, z);
-        if (d < 6.8) y = Math.max(y, P[i].y + T[i].y * j - (0.72 * (d - 3.5)) / 3.3);
+        const y = course.meshElevation(x, z);
         const s = 0.65 + rng() * 1.1;
         ps.set(x, y + 0.18 + rng() * 0.34, z);
         q.setFromAxisAngle(up, rng() * Math.PI * 2);
@@ -576,13 +587,13 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
         const j = (rng() - 0.5) * 1.5;
         const x = P[i].x + R[i].x * side * d + T[i].x * j;
         const z = P[i].z + R[i].z * side * d + T[i].z * j;
-        if (course.isOnSideRoad(x, z, 2.0)) {
+        const nrG = course.nearestRoad(x, z);
+        if ((nrG && nrG.d < 3.95) || course.isOnSideRoad(x, z, 2.0)) {
           mesh.setMatrixAt(k, m4.makeScale(0, 0, 0));
           mesh.setColorAt(k, c.setRGB(0.5, 0.5, 0.5));
           continue;
         }
-        let y = course.meshElevation(x, z);
-        if (d < 6.8) y = Math.max(y, P[i].y + T[i].y * j - (0.72 * (d - 3.5)) / 3.3);
+        const y = course.meshElevation(x, z);
         const tall = 0.28 + rng() * 0.5 + (d > 5 ? rng() * 0.25 : 0);
         ps.set(x, y - 0.03, z);
         q.setFromAxisAngle(up, rng() * Math.PI * 2);
@@ -610,7 +621,7 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
       const nr = course.nearestRoad(wx, wz);
       const sr = course.nearestSideRoad(wx, wz);
       let roadDist = nr ? Math.min(nr.d, 100) : 100;
-      if (sr) roadDist = Math.min(roadDist, Math.max(0, sr.d - sr.halfWidth - 2.5));
+      if (sr) roadDist = Math.min(roadDist, Math.max(0, sr.d - sr.halfWidth - Math.max(3.0, TC * 0.65)));
       fieldData.set(
         [
           H[k],
@@ -1096,22 +1107,40 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
       return tex;
     };
 
-    const lines = real.osm.lines;
+    // Subdivide long hedge/wall segments into <= 8 m pieces so they follow hill slopes without floating
+    const subLines = [];
+    for (const [x1, z1, x2, z2, kind] of real.osm.lines) {
+      const segLen = Math.hypot(x2 - x1, z2 - z1);
+      const steps = Math.max(1, Math.ceil(segLen / 8));
+      for (let s = 0; s < steps; s++) {
+        const t0 = s / steps;
+        const t1 = (s + 1) / steps;
+        const sx1 = x1 + (x2 - x1) * t0;
+        const sz1 = z1 + (z2 - z1) * t0;
+        const sx2 = x1 + (x2 - x1) * t1;
+        const sz2 = z1 + (z2 - z1) * t1;
+        const mx = (sx1 + sx2) * 0.5;
+        const mz = (sz1 + sz2) * 0.5;
+        const nr = course.nearestRoad(mx, mz);
+        if ((nr && nr.d < 4.4) || course.isOnSideRoad(mx, mz, 1.8)) continue;
+        subLines.push([sx1, sz1, sx2, sz2, kind]);
+      }
+    }
+
     const meshes = [
-      new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ map: wrapTex(hc), roughness: 1 }), lines.length),
-      new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ map: wrapTex(wc), roughness: 1 }), lines.length),
+      new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ map: wrapTex(hc), roughness: 1 }), Math.max(1, subLines.length)),
+      new THREE.InstancedMesh(box, new THREE.MeshStandardMaterial({ map: wrapTex(wc), roughness: 1 }), Math.max(1, subLines.length)),
     ];
     const counts = [0, 0];
-    for (const [x1, z1, x2, z2, kind] of lines) {
+    for (const [x1, z1, x2, z2, kind] of subLines) {
       const mx = (x1 + x2) / 2;
       const mz = (z1 + z2) / 2;
-      if (course.isOnSideRoad(mx, mz, 1.5)) continue;
       const segLen = Math.hypot(x2 - x1, z2 - z1);
       q.setFromAxisAngle(up, -Math.atan2(z2 - z1, x2 - x1));
       const scale = kind
-        ? sc.set(segLen + 0.3, 1.6, 0.55)
-        : sc.set(segLen + 0.5, 2.1 + rng() * 0.3, 1.3 + rng() * 0.3);
-      meshes[kind].setMatrixAt(counts[kind]++, m4.compose(ps.set(mx, course.meshElevation(mx, mz) - 0.5, mz), q, scale));
+        ? sc.set(segLen + 0.3, 1.9, 0.55)
+        : sc.set(segLen + 0.4, 2.3 + rng() * 0.3, 1.3 + rng() * 0.3);
+      meshes[kind].setMatrixAt(counts[kind]++, m4.compose(ps.set(mx, course.meshElevation(mx, mz) - 0.85, mz), q, scale));
     }
     meshes.forEach((m, k) => {
       m.count = counts[k];
@@ -1120,6 +1149,139 @@ export function buildWorld(scene, course, weather, images, maxAniso, uniforms, w
       m.frustumCulled = false;
       scene.add(m);
     });
+  }
+
+  /* ---------- 7b. OpenStreetMap Buildings (2 instanced draw calls: walls + pitched roofs) ---------- */
+  if (real && real.osm.buildings && real.osm.buildings.length) {
+    // Check building centre AND all 4 rotated corners against both main road and side roads
+    const bldgs = real.osm.buildings.filter(([cx, cz, w, d, ang]) => {
+      const ca = Math.cos(ang);
+      const sa = Math.sin(ang);
+      const hw = w * 0.52;
+      const hd = d * 0.52;
+      const pts = [
+        [cx, cz],
+        [cx + ca * hw - sa * hd, cz + sa * hw + ca * hd],
+        [cx - ca * hw - sa * hd, cz - sa * hw + ca * hd],
+        [cx + ca * hw + sa * hd, cz + sa * hw - ca * hd],
+        [cx - ca * hw + sa * hd, cz - sa * hw - ca * hd],
+      ];
+      for (const [px, pz] of pts) {
+        const nr = course.nearestRoad(px, pz);
+        if (nr && nr.d < 4.5) return false;
+        if (course.isOnSideRoad(px, pz, 1.2)) return false;
+      }
+      return true;
+    });
+    if (bldgs.length) {
+      // Procedural facade texture with subtle masonry & glazed windows
+      const [fc, fg] = createCanvas2D(128, 128);
+      fg.fillStyle = '#ddd6ca';
+      fg.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 400; i++) {
+        const v = 205 + ((rng() * 32) | 0);
+        fg.fillStyle = `rgba(${v},${v - 5},${v - 12},0.35)`;
+        fg.fillRect(rng() * 128, rng() * 128, 4 + rng() * 8, 2 + rng() * 3);
+      }
+      // 2 rows x 3 cols of windows
+      for (let row = 0; row < 2; row++) {
+        const wy = 20 + row * 52;
+        for (let colIdx = 0; colIdx < 3; colIdx++) {
+          const wx = 14 + colIdx * 38;
+          fg.fillStyle = '#edeae4';
+          fg.fillRect(wx - 2, wy - 2, 24, 30);
+          fg.fillStyle = '#2d3744';
+          fg.fillRect(wx, wy, 20, 26);
+          fg.fillStyle = 'rgba(180,205,230,0.22)';
+          fg.fillRect(wx + 2, wy + 2, 7, 10);
+        }
+      }
+      const facadeTex = new THREE.CanvasTexture(fc);
+      facadeTex.wrapS = THREE.RepeatWrapping;
+      facadeTex.wrapT = THREE.RepeatWrapping;
+      facadeTex.colorSpace = THREE.SRGBColorSpace;
+
+      const wallGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+      const wallMat = new THREE.MeshStandardMaterial({ map: facadeTex, roughness: 0.9, metalness: 0.02 });
+      const wallMesh = new THREE.InstancedMesh(wallGeo, wallMat, bldgs.length);
+
+      // Gable pitched roof prism (width along X, depth along Z, ridge along X, height 0..1)
+      const roofPos = new Float32Array([
+        // Left slope (-Z to ridge)
+        -0.52, 0, -0.52,  0.52, 0, -0.52,  0.52, 1, 0,
+        -0.52, 0, -0.52,  0.52, 1, 0,     -0.52, 1, 0,
+        // Right slope (+Z to ridge)
+         0.52, 0,  0.52, -0.52, 0,  0.52, -0.52, 1, 0,
+         0.52, 0,  0.52, -0.52, 1, 0,      0.52, 1, 0,
+        // Front & back gable triangles
+        -0.52, 0,  0.52, -0.52, 0, -0.52, -0.52, 1, 0,
+         0.52, 0, -0.52,  0.52, 0,  0.52,  0.52, 1, 0,
+      ]);
+      const roofGeo = new THREE.BufferGeometry();
+      roofGeo.setAttribute('position', new THREE.BufferAttribute(roofPos, 3));
+      roofGeo.computeVertexNormals();
+      const roofMat = new THREE.MeshStandardMaterial({ roughness: 0.88, metalness: 0.05 });
+      const pitchedBldgs = bldgs.filter((b) => b[6] === 1);
+      const roofMesh = pitchedBldgs.length
+        ? new THREE.InstancedMesh(roofGeo, roofMat, pitchedBldgs.length)
+        : null;
+
+      const wallPalette = [
+        [0.78, 0.54, 0.44], // warm red brick
+        [0.86, 0.79, 0.66], // Cotswold stone / sandstone
+        [0.90, 0.88, 0.84], // cream render
+        [0.76, 0.73, 0.69], // weathered grey stone
+        [0.82, 0.66, 0.52], // buff brick
+      ];
+      const roofPalette = [
+        [0.24, 0.25, 0.28], // dark slate
+        [0.34, 0.30, 0.29], // weathered grey tile
+        [0.48, 0.27, 0.21], // terracotta clay tile
+      ];
+
+      const m4 = new THREE.Matrix4();
+      const q = new THREE.Quaternion();
+      const up = new V3(0, 1, 0);
+      const sc = new V3();
+      const ps = new V3();
+      const c = new THREE.Color();
+
+      let rIdx = 0;
+      bldgs.forEach(([cx, cz, w, d, ang, h, pitched], i) => {
+        const baseY = course.meshElevation(cx, cz);
+        const embed = 1.4;
+        const wallH = Math.max(2.6, h || 5.6);
+        q.setFromAxisAngle(up, -ang);
+        ps.set(cx, baseY - embed, cz);
+        sc.set(w, wallH + embed, d);
+        wallMesh.setMatrixAt(i, m4.compose(ps, q, sc));
+        const wp = wallPalette[(rng() * wallPalette.length) | 0];
+        const v = 0.92 + rng() * 0.16;
+        wallMesh.setColorAt(i, c.setRGB(wp[0] * v, wp[1] * v, wp[2] * v));
+
+        if (pitched === 1 && roofMesh) {
+          const roofH = Math.min(3.8, Math.max(1.5, Math.min(w, d) * 0.34));
+          ps.set(cx, baseY + wallH - 0.05, cz);
+          sc.set(w, roofH, d);
+          roofMesh.setMatrixAt(rIdx, m4.compose(ps, q, sc));
+          const rp = roofPalette[(rng() * roofPalette.length) | 0];
+          const rv = 0.88 + rng() * 0.24;
+          roofMesh.setColorAt(rIdx, c.setRGB(rp[0] * rv, rp[1] * rv, rp[2] * rv));
+          rIdx++;
+        }
+      });
+
+      wallMesh.castShadow = true;
+      wallMesh.receiveShadow = true;
+      wallMesh.frustumCulled = false;
+      scene.add(wallMesh);
+      if (roofMesh) {
+        roofMesh.castShadow = true;
+        roofMesh.receiveShadow = true;
+        roofMesh.frustumCulled = false;
+        scene.add(roofMesh);
+      }
+    }
   }
 
   /* ---------- 8. Quarry smoke on the scarp (real courses) ---------- */

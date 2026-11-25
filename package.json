@@ -1,6 +1,6 @@
 {
   "name": "golden-hour-riding",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "author": "Mark Bright",
   "description": "Standalone 3D indoor cycling simulator for macOS and Windows with smart trainer (FTMS) support.",
   "main": "electron/main.cjs",

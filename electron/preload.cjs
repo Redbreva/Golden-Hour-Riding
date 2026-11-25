@@ -20,3 +20,15 @@ contextBridge.exposeInMainWorld('electronVoice', {
     return () => ipcRenderer.removeListener('voice:event', listener);
   },
 });
+
+contextBridge.exposeInMainWorld('electronCourses', {
+  list: () => ipcRenderer.invoke('courses:list'),
+  load: (id) => ipcRenderer.invoke('courses:load', id),
+  importRoute: () => ipcRenderer.invoke('courses:import'),
+  deleteCourse: (id) => ipcRenderer.invoke('courses:delete', id),
+  onImportProgress: (handler) => {
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on('courses:import-progress', listener);
+    return () => ipcRenderer.removeListener('courses:import-progress', listener);
+  },
+});
