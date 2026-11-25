@@ -14,11 +14,14 @@ function loadScript(src) {
 }
 
 export async function loadRealCourseData(courseId) {
-  await loadScript(`./assets/${courseId}.js`);
-  await loadScript(`./assets/${courseId}_osm.js`).catch(() => {});
+  if (!window.RIDE_COURSES?.[courseId]) {
+    await loadScript(`./assets/${courseId}.js`);
+    await loadScript(`./assets/${courseId}_osm.js`).catch(() => {});
+  }
 
   const data = window.RIDE_COURSES?.[courseId];
   if (!data) throw new Error(`Course "${courseId}" did not register on window.RIDE_COURSES`);
+  if (data._prepared) return data;
 
   data.osm = data.osm || { buildings: [], trees: [], lines: [], woods: '', credit: '' };
 
@@ -43,6 +46,7 @@ export async function loadRealCourseData(courseId) {
     (v) => data.demMin + (v / 65535) * (data.demMax - data.demMin)
   );
   data.creditText = [data.credit, data.osm.credit].filter(Boolean).join(' ').trim();
+  data._prepared = true;
 
   return data;
 }

@@ -308,13 +308,11 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
     u.uZ.value.copy(saved[2]);
     u.uPaint.value = saved[3];
 
-    const weatherBtn = document.getElementById('btn-weather');
-    if (weatherBtn) {
-      weatherBtn.textContent = `Weather: ${WEATHER_LABELS[name] || name} ▾`;
-    }
-    document.querySelectorAll('#weather-panel .course-card').forEach((card) => {
-      card.classList.toggle('active', card.dataset.weather === name);
+    document.querySelectorAll('[data-weather]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.weather === name);
     });
+    const accVal = document.getElementById('acc-weather-val');
+    if (accVal) accVal.textContent = WEATHER_LABELS[name] || name;
   }
 
   function stepWeather(dt, sceneryMode, terrainMat, roadMat) {
@@ -361,6 +359,13 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
     renderer.toneMappingExposure = current.expo;
   }
 
+  function dispose() {
+    envRT.dispose();
+    pmrem.dispose();
+    scene.environment = null;
+    scene.fog = null;
+  }
+
   return {
     sunDir,
     sunFlat,
@@ -372,5 +377,6 @@ export function createWeatherSystem(renderer, scene, camera, uniforms, winterMod
     get currentName() { return currentName; },
     setWeather,
     stepWeather,
+    dispose,
   };
 }

@@ -16,30 +16,99 @@
     <div><b id="hud-dist">0.00</b><span>km</span></div>
   </div>
 
-  <div id="controls">
-    <span class="ctl-label">POWER</span>
-    <input id="power-slider" type="range" min="0" max="600" step="5" value="220" aria-label="Power in watts" />
-    <span class="ctl-hint">↑ ↓ keys</span>
-    <button id="btn-skip" type="button" title="Jump 250 m forward (→ key; ← goes back)">Skip 250 m ›</button>
-    <button id="btn-voice" type="button" title="Native offline voice commands: golden, overcast, rain, mist, starry, snow, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
-    <button id="btn-course" type="button" aria-expanded="false" aria-controls="course-panel" title="Choose a course or theme">Course: Valley ▾</button>
-    <button id="btn-weather" type="button" aria-expanded="false" aria-controls="weather-panel" title="Choose weather (or press 1–6)">Weather: Golden ▾</button>
-    <button id="btn-trainer" type="button">Connect trainer</button>
-    <div id="hills-group" title="Smart trainer gradient difficulty (0% = flat, 100% = full slope)">
-      <button id="btn-hills-down" type="button" aria-label="Make hills easier">−</button>
-      <span id="hills-label">Hills 50 %</span>
-      <button id="btn-hills-up" type="button" aria-label="Make hills harder">+</button>
-    </div>
-    <button id="btn-light" type="button" title="Toggle bike headlight (L key)">Light: off</button>
-    <button id="btn-res" type="button" title="Toggle render resolution: 1× vs 0.75× Fast (Q key)">Res: 1×</button>
-    <button id="btn-sound" type="button" class="on" title="Toggle wind/tyre/rain audio (M key). Automatically mutes when window is unfocused.">Sound: on</button>
-    <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info</button>
-    <button id="btn-log" type="button" title="Ride history stored locally">Log</button>
+  <div id="topbar">
+    <button id="btn-menu" type="button" aria-expanded="false" aria-controls="menu-drawer" title="Open menu (Esc)">
+      <span class="hamburger" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>Menu</span>
+    </button>
+    <span id="status-trainer" class="status-chip" hidden><i class="dot dot-green"></i>Trainer</span>
+    <span id="status-voice" class="status-chip" hidden><i class="dot dot-amber"></i>Voice</span>
   </div>
 
-  <aside id="course-panel" hidden aria-label="Course selector"></aside>
-  <aside id="weather-panel" hidden aria-label="Weather selector"></aside>
-  <aside id="ride-log" hidden aria-label="Ride log"></aside>
+  <aside id="menu-drawer" hidden aria-label="Controls and settings">
+    <div class="drawer-head">
+      <div>
+        <h2>Golden Hour Riding</h2>
+        <div id="drawer-course-sub" class="drawer-sub">Alpine Valley</div>
+      </div>
+      <button id="btn-menu-close" type="button" aria-label="Close menu" title="Close menu (Esc)">✕</button>
+    </div>
+
+    <div class="drawer-body">
+      <section class="menu-section">
+        <h3>Ride &amp; Smart Trainer</h3>
+        <div class="power-row">
+          <span class="ctl-label">POWER</span>
+          <input id="power-slider" type="range" min="0" max="600" step="5" value="220" aria-label="Power in watts" />
+          <span id="power-readout" class="power-val">220 W</span>
+        </div>
+        <div class="btn-row">
+          <button id="btn-back" type="button" title="Jump 250 m back (← key)">‹ Back 250 m</button>
+          <button id="btn-skip" type="button" title="Jump 250 m forward (→ key)">Skip 250 m ›</button>
+        </div>
+        <div class="btn-row">
+          <button id="btn-trainer" type="button" class="btn-wide">Connect trainer</button>
+        </div>
+        <div id="hills-group" title="Smart trainer gradient difficulty (0% = flat, 100% = full slope)">
+          <button id="btn-hills-down" type="button" aria-label="Make hills easier">−</button>
+          <span id="hills-label">Hills 50 %</span>
+          <button id="btn-hills-up" type="button" aria-label="Make hills harder">+</button>
+        </div>
+      </section>
+
+      <details class="menu-accordion" id="acc-course">
+        <summary>
+          <span>Course</span>
+          <span class="acc-meta"><span id="acc-course-val">Valley</span><span class="acc-chev">▾</span></span>
+        </summary>
+        <div class="acc-body">
+          <div id="course-list" class="course-list"></div>
+        </div>
+      </details>
+
+      <details class="menu-accordion" id="acc-weather">
+        <summary>
+          <span>Weather &amp; Bike</span>
+          <span class="acc-meta"><span id="acc-weather-val">Golden Hour</span><span class="acc-chev">▾</span></span>
+        </summary>
+        <div class="acc-body">
+          <div id="weather-grid" class="weather-grid"></div>
+          <div class="btn-row">
+            <button id="btn-light" type="button" title="Toggle bike headlight (L key)">Light: off</button>
+            <button id="btn-sound" type="button" class="on" title="Toggle wind/tyre/rain audio (M key)">Sound: on</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="menu-accordion" id="acc-display">
+        <summary>
+          <span>Display &amp; Voice</span>
+          <span class="acc-meta"><span id="acc-display-val">1×</span><span class="acc-chev">▾</span></span>
+        </summary>
+        <div class="acc-body">
+          <div class="btn-row">
+            <button id="btn-res" type="button" title="Toggle render resolution: 1× vs 0.75× Fast (Q key)">Res: 1×</button>
+            <button id="btn-fps" type="button" title="Toggle FPS overlay (F key)">FPS: off</button>
+          </div>
+          <div class="btn-row">
+            <button id="btn-voice" type="button" title="Native offline voice commands: golden, sunset, overcast, rain, mist, starry, snow, light on/off, skip, back, hide, show, easier, harder, flat, full">Voice: off</button>
+            <button id="btn-clean" type="button" title="Hide HUD and controls (H key). Click or press H to restore.">Hide info (H)</button>
+          </div>
+        </div>
+      </details>
+
+      <details class="menu-accordion" id="acc-log">
+        <summary id="btn-log" title="Ride history stored locally">
+          <span>Ride Log</span>
+          <span class="acc-meta"><span class="acc-chev">▾</span></span>
+        </summary>
+        <div class="acc-body">
+          <div id="ride-log" aria-label="Ride log"></div>
+        </div>
+      </details>
+    </div>
+  </aside>
+
   <div id="fps-badge" hidden aria-hidden="true">-- FPS</div>
   <div id="credit"></div>
 

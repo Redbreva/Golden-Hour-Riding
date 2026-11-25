@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { smoothstep } from './noise.js';
 import { loadSurfaceImages } from './textures.js';
-import { COURSES, resolveCourseFromSearch } from './courses.js';
+import { COURSES, getCourseById, resolveCourseFromSearch } from './courses.js';
 import { createCourse, loadRealCourseData } from './course.js';
 import { createWeatherSystem } from './weather.js';
 import { buildWorld } from './world.js';
@@ -17,9 +17,9 @@ const V3 = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
 
 const params = new URLSearchParams(window.location.search);
-const activeCourseDef = resolveCourseFromSearch(window.location.search);
-const courseId = activeCourseDef.id;
-const winterMode = Boolean(activeCourseDef.winter);
+let activeCourseDef = resolveCourseFromSearch(window.location.search);
+let courseId = activeCourseDef.id;
+let winterMode = Boolean(activeCourseDef.winter);
 const sceneryParam = params.get('scenery');
 const sceneryMode = sceneryParam !== null;
 
@@ -67,144 +67,62 @@ const uniforms = {
   uPx: { value: (window.innerHeight * getActivePixelRatio()) / (2 * Math.tan(0.6)) },
 };
 
+const loadingEl = $('loading');
+let loadingHideTimer = null;
+function showLoading(text) {
+  if (loadingHideTimer) {
+    clearTimeout(loadingHideTimer);
+    loadingHideTimer = null;
+  }
+  loadingEl.textContent = text || 'Building course…';
+  loadingEl.hidden = false;
+  loadingEl.style.pointerEvents = 'auto';
+  loadingEl.style.opacity = '1';
+}
+function hideLoading() {
+  loadingEl.style.opacity = '0';
+  loadingEl.style.pointerEvents = 'none';
+  loadingHideTimer = setTimeout(() => {
+    loadingEl.hidden = true;
+  }, 850);
+}
+
+// Hamburger menu drawer
+const menuBtn = $('btn-menu');
+const menuDrawer = $('menu-drawer');
+const menuCloseBtn = $('btn-menu-close');
+
+function setMenuOpen(open) {
+  menuDrawer.hidden = !open;
+  menuBtn.classList.toggle('on', open);
+  menuBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+
+menuBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setMenuOpen(menuDrawer.hidden);
+});
+menuCloseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  setMenuOpen(false);
+});
+menuDrawer.addEventListener('click', (e) => e.stopPropagation());
+
+// Load shared surface textures once
+showLoading(activeCourseDef.loadingText || 'Building course…');
+const images = await loadSurfaceImages();
+
 let realData = null;
-$('loading').textContent = activeCourseDef.loadingText || 'Building course…';
 if (activeCourseDef.type === 'real') {
   realData = await loadRealCourseData(activeCourseDef.dataId || activeCourseDef.id);
   $('credit').textContent = realData.creditText;
+} else {
+  $('credit').textContent = '';
 }
 
-// Course selector panel
-const courseBtn = $('btn-course');
-const coursePanel = $('course-panel');
-courseBtn.textContent = `Course: ${activeCourseDef.shortName} ▾`;
-
-function renderCoursePanel() {
-  coursePanel.innerHTML =
-    `<h3>Select Course</h3><div class="course-list">` +
-    COURSES.map(
-      (c) =>
-        `<button type="button" class="course-card${c.id === activeCourseDef.id ? ' active' : ''}" data-course-id="${c.id}">` +
-        `<div class="course-card-head"><span class="course-card-name">${c.name}</span><span class="course-badge">${c.badge}</span></div>` +
-        `<div class="course-card-sub">${c.subtitle}</div>` +
-        `</button>`
-    ).join('') +
-    `</div>`;
-
-  coursePanel.querySelectorAll('.course-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      const targetId = card.dataset.courseId;
-      if (targetId === activeCourseDef.id) {
-        closeCoursePanel();
-        return;
-      }
-      const url = new URL(window.location.href);
-      url.searchParams.delete('theme');
-      if (targetId === 'valley') url.searchParams.delete('course');
-      else url.searchParams.set('course', targetId);
-      window.location.href = url.toString();
-    });
-  });
-}
-
-function closeCoursePanel() {
-  coursePanel.hidden = true;
-  courseBtn.classList.remove('on');
-  courseBtn.setAttribute('aria-expanded', 'false');
-}
-
-function closeAllPanels() {
-  closeCoursePanel();
-  closeWeatherPanel();
-  const logPanel = $('ride-log');
-  if (!logPanel.hidden) {
-    logPanel.hidden = true;
-    $('btn-log').classList.remove('on');
-  }
-}
-
-courseBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const willOpen = coursePanel.hidden;
-  closeAllPanels();
-  if (willOpen) {
-    renderCoursePanel();
-    coursePanel.hidden = false;
-    courseBtn.classList.add('on');
-    courseBtn.setAttribute('aria-expanded', 'true');
-  }
-});
-
-coursePanel.addEventListener('click', (e) => e.stopPropagation());
-
-// Weather selector panel
-const WEATHER_OPTIONS = [
-  ...(winterMode ? [{ id: 'snow', name: 'Snow', subtitle: 'Winter dusk with gentle falling snow', key: 'Snow' }] : []),
-  { id: 'golden', name: 'Golden Hour', subtitle: 'Low warm sun, long shadows & light shafts', key: '1' },
-  { id: 'sunset', name: 'Deep Sunset', subtitle: 'Amber-rose dusk sky with long dramatic shadows', key: '2' },
-  { id: 'overcast', name: 'Overcast', subtitle: 'Soft diffuse light under a grey cloud deck', key: '3' },
-  { id: 'rain', name: 'Rain', subtitle: 'Falling streaks, wet tarmac ripples & lens drops', key: '4' },
-  { id: 'mist', name: 'Mist', subtitle: 'Thick valley fog with soft sunlit rays', key: '5' },
-  { id: 'starry', name: 'Starry Night', subtitle: 'Swirling night sky with painterly brush filter', key: '6' },
-];
-const weatherBtn = $('btn-weather');
-const weatherPanel = $('weather-panel');
-
-function closeWeatherPanel() {
-  weatherPanel.hidden = true;
-  weatherBtn.classList.remove('on');
-  weatherBtn.setAttribute('aria-expanded', 'false');
-}
-
-function renderWeatherPanel() {
-  weatherPanel.innerHTML =
-    `<h3>Select Weather</h3><div class="course-list">` +
-    WEATHER_OPTIONS.map(
-      (w) =>
-        `<button type="button" class="course-card${w.id === weather.currentName ? ' active' : ''}" data-weather="${w.id}">` +
-        `<div class="course-card-head"><span class="course-card-name">${w.name}</span><span class="course-badge">${w.key}</span></div>` +
-        `<div class="course-card-sub">${w.subtitle}</div>` +
-        `</button>`
-    ).join('') +
-    `</div>`;
-
-  weatherPanel.querySelectorAll('.course-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      weather.setWeather(card.dataset.weather);
-      closeWeatherPanel();
-    });
-  });
-}
-
-weatherBtn.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const willOpen = weatherPanel.hidden;
-  closeAllPanels();
-  if (willOpen) {
-    renderWeatherPanel();
-    weatherPanel.hidden = false;
-    weatherBtn.classList.add('on');
-    weatherBtn.setAttribute('aria-expanded', 'true');
-  }
-});
-
-weatherPanel.addEventListener('click', (e) => e.stopPropagation());
-
-window.addEventListener('click', () => {
-  if (!coursePanel.hidden) closeCoursePanel();
-  if (!weatherPanel.hidden) closeWeatherPanel();
-});
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    if (!coursePanel.hidden) closeCoursePanel();
-    if (!weatherPanel.hidden) closeWeatherPanel();
-  }
-});
-
-const images = await loadSurfaceImages();
-const weather = createWeatherSystem(renderer, scene, camera, uniforms, winterMode);
-const course = createCourse(weather.sunFlat, realData);
-const world = buildWorld(scene, course, weather, images, maxAniso, uniforms, winterMode);
+let weather = createWeatherSystem(renderer, scene, camera, uniforms, winterMode);
+let course = createCourse(weather.sunFlat, realData);
+let world = buildWorld(scene, course, weather, images, maxAniso, uniforms, winterMode);
 const cockpit = createCockpit(camera);
 const postfx = createPostProcessing(renderer, scene, camera, weather.hazeLum);
 const audio = createAudioEngine();
@@ -213,84 +131,184 @@ const state = createRideState();
 state.s = activeCourseDef.startDistance ?? course.startDistance;
 window.ride = state;
 
-$('btn-log').addEventListener('click', () => {
-  if (!coursePanel.hidden) closeCoursePanel();
-  if (!weatherPanel.hidden) closeWeatherPanel();
-});
+function getWeatherOptions() {
+  return [
+    ...(winterMode ? [{ id: 'snow', name: 'Snow', key: 'S' }] : []),
+    { id: 'golden', name: 'Golden Hour', key: '1' },
+    { id: 'sunset', name: 'Deep Sunset', key: '2' },
+    { id: 'overcast', name: 'Overcast', key: '3' },
+    { id: 'rain', name: 'Rain', key: '4' },
+    { id: 'mist', name: 'Mist', key: '5' },
+    { id: 'starry', name: 'Starry Night', key: '6' },
+  ];
+}
 
-// Initial weather label
+function renderWeatherGrid() {
+  const grid = $('weather-grid');
+  grid.innerHTML = getWeatherOptions()
+    .map(
+      (w) =>
+        `<button type="button" class="weather-pill${w.id === weather.currentName ? ' active' : ''}" data-weather="${w.id}">` +
+        `<span>${w.name}</span><span class="weather-key">${w.key}</span>` +
+        `</button>`
+    )
+    .join('');
+
+  grid.querySelectorAll('.weather-pill').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      weather.setWeather(btn.dataset.weather);
+    });
+  });
+}
+
+function renderCourseList() {
+  const list = $('course-list');
+  $('drawer-course-sub').textContent = activeCourseDef.name;
+  const accCourseVal = $('acc-course-val');
+  if (accCourseVal) accCourseVal.textContent = activeCourseDef.shortName;
+  list.innerHTML = COURSES.map(
+    (c) =>
+      `<button type="button" class="course-card${c.id === activeCourseDef.id ? ' active' : ''}" data-course-id="${c.id}">` +
+      `<div class="course-card-head"><span class="course-card-name">${c.name}</span><span class="course-badge">${c.badge}</span></div>` +
+      `<div class="course-card-sub">${c.subtitle}</div>` +
+      `</button>`
+  ).join('');
+
+  list.querySelectorAll('.course-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      const targetId = card.dataset.courseId;
+      if (targetId === activeCourseDef.id) {
+        setMenuOpen(false);
+        return;
+      }
+      switchCourse(targetId);
+    });
+  });
+}
+
+function disposeCurrentScene() {
+  const toRemove = scene.children.filter((child) => child !== camera);
+  for (const obj of toRemove) {
+    scene.remove(obj);
+    obj.traverse((node) => {
+      if (node.geometry) node.geometry.dispose();
+      if (node.material) {
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        for (const mat of mats) {
+          for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap', 'emissiveMap']) {
+            if (mat[key] && typeof mat[key].dispose === 'function') mat[key].dispose();
+          }
+          mat.dispose();
+        }
+      }
+    });
+  }
+  if (weather && typeof weather.dispose === 'function') {
+    weather.dispose();
+  }
+}
+
+let switchingCourse = false;
+async function switchCourse(targetId) {
+  if (switchingCourse) return;
+  const nextDef = getCourseById(targetId);
+  if (!nextDef) return;
+  switchingCourse = true;
+  setMenuOpen(false);
+  showLoading(nextDef.loadingText || `Building ${nextDef.name}…`);
+
+  // Yield a frame so the loading overlay renders before synchronous mesh generation
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  try {
+    let nextRealData = null;
+    if (nextDef.type === 'real') {
+      nextRealData = await loadRealCourseData(nextDef.dataId || nextDef.id);
+    }
+
+    disposeCurrentScene();
+
+    activeCourseDef = nextDef;
+    courseId = nextDef.id;
+    winterMode = Boolean(nextDef.winter);
+    realData = nextRealData;
+    $('credit').textContent = realData ? realData.creditText : '';
+
+    weather = createWeatherSystem(renderer, scene, camera, uniforms, winterMode);
+    course = createCourse(weather.sunFlat, realData);
+    world = buildWorld(scene, course, weather, images, maxAniso, uniforms, winterMode);
+    postfx.rays.uniforms.uThr.value = weather.hazeLum * 2.0;
+
+    // Reset route progress while preserving live Bluetooth trainer connection & target power
+    state.s = activeCourseDef.startDistance ?? course.startDistance;
+    state.v = state.trainerConnected ? 0 : 6;
+    state.distance = 0;
+    state.grade = 0;
+    state.lean = 0;
+
+    if (winterMode) {
+      weather.setWeather('snow', true);
+    } else {
+      weather.setWeather('golden', true);
+    }
+
+    rideLog.setCourse(courseId);
+    renderCourseList();
+    renderWeatherGrid();
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('theme');
+    if (courseId === 'valley') url.searchParams.delete('course');
+    else url.searchParams.set('course', courseId);
+    window.history.replaceState(null, '', url.toString());
+  } catch (err) {
+    console.error('Failed to switch course:', err);
+  } finally {
+    switchingCourse = false;
+    hideLoading();
+  }
+}
+
+// Initial weather + drawer lists
 if (winterMode) {
   weather.setWeather('snow', true);
 } else {
   weather.setWeather('golden', true);
 }
+renderCourseList();
+renderWeatherGrid();
 
 const setTargetPower = (w) => {
   state.targetPower = Math.min(900, Math.max(0, w));
-  $('power-slider').value = state.targetPower;
+  $('power-slider').value = Math.min(600, state.targetPower);
+  $('power-readout').textContent = `${Math.round(state.targetPower)} W`;
 };
 const skipDistance = (metres) => {
   state.s = (((state.s + metres) % course.length) + course.length) % course.length;
 };
-const setCleanMode = (hide) => document.body.classList.toggle('clean', hide);
+const setCleanMode = (hide) => {
+  if (hide) setMenuOpen(false);
+  document.body.classList.toggle('clean', hide);
+};
 const isCleanMode = () => document.body.classList.contains('clean');
 
 $('power-slider').addEventListener('input', (e) => {
-  state.targetPower = +e.target.value;
+  setTargetPower(+e.target.value);
 });
+$('btn-back').addEventListener('click', () => skipDistance(-250));
 $('btn-skip').addEventListener('click', () => skipDistance(250));
 $('btn-clean').addEventListener('click', (e) => {
   e.stopPropagation();
   setCleanMode(true);
 });
+
 window.addEventListener('click', () => {
-  if (isCleanMode()) setCleanMode(false);
+  if (isCleanMode()) {
+    setCleanMode(false);
+    return;
+  }
+  if (!menuDrawer.hidden) setMenuOpen(false);
 });
-
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'ArrowUp') setTargetPower(state.targetPower + 10);
-  if (e.key === 'ArrowDown') setTargetPower(state.targetPower - 10);
-  if (e.key === 'ArrowRight') skipDistance(250);
-  if (e.key === 'ArrowLeft') skipDistance(-250);
-  if ((e.key === 'h' || e.key === 'H') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    setCleanMode(!isCleanMode());
-  }
-  if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    toggleSound();
-  }
-  if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    setHeadlight(!cockpit.isHeadlightOn());
-  }
-  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    const badge = $('fps-badge');
-    badge.hidden = !badge.hidden;
-  }
-  if ((e.key === 'q' || e.key === 'Q') && !e.metaKey && !e.ctrlKey && !e.altKey) {
-    toggleResolution();
-  }
-  const weatherKey = ['golden', 'sunset', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
-  if (weatherKey) weather.setWeather(weatherKey);
-});
-
-const resBtn = $('btn-res');
-function updateResButton() {
-  const isFast = resMode === '0.75x';
-  resBtn.textContent = isFast ? 'Res: 0.75×' : 'Res: 1×';
-  resBtn.classList.toggle('on', isFast);
-}
-function toggleResolution() {
-  const nextIdx = (RES_MODES.indexOf(resMode) + 1) % RES_MODES.length;
-  resMode = RES_MODES[nextIdx];
-  localStorage.setItem('ghr_res', resMode);
-  const dpr = getActivePixelRatio();
-  renderer.setPixelRatio(dpr);
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  postfx.setPixelRatio(dpr, window.innerWidth, window.innerHeight);
-  uniforms.uPx.value = (window.innerHeight * dpr) / (2 * Math.tan(0.6));
-  updateResButton();
-}
-updateResButton();
-resBtn.addEventListener('click', toggleResolution);
 
 const lightBtn = $('btn-light');
 function setHeadlight(on) {
@@ -308,6 +326,67 @@ function toggleSound() {
   soundBtn.classList.toggle('on', !nextMuted);
 }
 soundBtn.addEventListener('click', toggleSound);
+
+const resBtn = $('btn-res');
+function updateResButton() {
+  const isFast = resMode === '0.75x';
+  resBtn.textContent = isFast ? 'Res: 0.75×' : 'Res: 1×';
+  resBtn.classList.toggle('on', isFast);
+  const accDispVal = $('acc-display-val');
+  if (accDispVal) accDispVal.textContent = isFast ? '0.75×' : '1×';
+}
+function toggleResolution() {
+  const nextIdx = (RES_MODES.indexOf(resMode) + 1) % RES_MODES.length;
+  resMode = RES_MODES[nextIdx];
+  localStorage.setItem('ghr_res', resMode);
+  const dpr = getActivePixelRatio();
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  postfx.setPixelRatio(dpr, window.innerWidth, window.innerHeight);
+  uniforms.uPx.value = (window.innerHeight * dpr) / (2 * Math.tan(0.6));
+  updateResButton();
+}
+updateResButton();
+resBtn.addEventListener('click', toggleResolution);
+
+const fpsBtn = $('btn-fps');
+function toggleFps() {
+  const badge = $('fps-badge');
+  badge.hidden = !badge.hidden;
+  const visible = !badge.hidden;
+  fpsBtn.textContent = visible ? 'FPS: on' : 'FPS: off';
+  fpsBtn.classList.toggle('on', visible);
+}
+fpsBtn.addEventListener('click', toggleFps);
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (isCleanMode()) setCleanMode(false);
+    else setMenuOpen(menuDrawer.hidden);
+    return;
+  }
+  if (e.key === 'ArrowUp') setTargetPower(state.targetPower + 10);
+  if (e.key === 'ArrowDown') setTargetPower(state.targetPower - 10);
+  if (e.key === 'ArrowRight') skipDistance(250);
+  if (e.key === 'ArrowLeft') skipDistance(-250);
+  if ((e.key === 'h' || e.key === 'H') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    setCleanMode(!isCleanMode());
+  }
+  if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleSound();
+  }
+  if ((e.key === 'l' || e.key === 'L') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    setHeadlight(!cockpit.isHeadlightOn());
+  }
+  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleFps();
+  }
+  if ((e.key === 'q' || e.key === 'Q') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    toggleResolution();
+  }
+  const weatherKey = ['golden', 'sunset', 'overcast', 'rain', 'mist', 'starry'][+e.key - 1];
+  if (weatherKey) weather.setWeather(weatherKey);
+});
 
 audio.unlock();
 window.addEventListener('focus', () => {
@@ -329,12 +408,15 @@ const trainer = createTrainerController({
   btCancelBtn: $('bt-cancel'),
   onPower: setTargetPower,
   getGrade: () => state.grade,
-  onConnectedChange: (connected) => { state.trainerConnected = connected; },
+  onConnectedChange: (connected) => {
+    state.trainerConnected = connected;
+    $('status-trainer').hidden = !connected;
+  },
 });
 
 initVoiceControl({
   button: $('btn-voice'),
-  winterMode,
+  isWinterMode: () => winterMode,
   setWeather: (w) => weather.setWeather(w),
   skipDistance,
   setCleanMode,
@@ -347,9 +429,12 @@ initVoiceControl({
   adjustHills: (delta) => trainer.setHills(trainer.getHillsPercent() + delta),
   setHills: (pct) => trainer.setHills(pct),
   getHillsLabel: () => trainer.getHillsLabel(),
+  onStatusChange: (listening) => {
+    $('status-voice').hidden = !listening;
+  },
 });
 
-initRideLog({
+const rideLog = initRideLog({
   panel: $('ride-log'),
   toggleBtn: $('btn-log'),
   courseId,
@@ -411,79 +496,77 @@ function animate() {
     fpsElapsed = 0;
   }
 
-  stepRidePhysics(state, dt, course, pose, probe, sceneryMode);
+  if (!switchingCourse) {
+    stepRidePhysics(state, dt, course, pose, probe, sceneryMode);
 
-  if (sceneryMode) {
-    sceneryElapsed += dt;
-    if (sceneryElapsed >= sceneryPlan[sceneryIndex][1]) {
-      sceneryElapsed = 0;
-      sceneryIndex = (sceneryIndex + 1) % sceneryPlan.length;
-      weather.setWeather(sceneryPlan[sceneryIndex][0]);
+    if (sceneryMode) {
+      sceneryElapsed += dt;
+      if (sceneryElapsed >= sceneryPlan[sceneryIndex][1]) {
+        sceneryElapsed = 0;
+        sceneryIndex = (sceneryIndex + 1) % sceneryPlan.length;
+        weather.setWeather(sceneryPlan[sceneryIndex][0]);
+      }
     }
-  }
 
-  // Camera tracking, lean, pedal sway, and speed FOV
-  course.samplePose(state.s, pose);
-  course.samplePose(state.s + 9, ahead);
-  uniforms.uMeadow.value.set(pose.p.x + pose.t.x * 78, pose.p.z + pose.t.z * 78);
+    // Camera tracking, lean, pedal sway, and speed FOV
+    course.samplePose(state.s, pose);
+    course.samplePose(state.s + 9, ahead);
+    uniforms.uMeadow.value.set(pose.p.x + pose.t.x * 78, pose.p.z + pose.t.z * 78);
 
-  const effort = Math.min(1, state.power / 300);
-  const sway = Math.sin(state.pedalPhase);
-  camera.position.copy(pose.p).addScaledVector(pose.r, LANE_OFFSET + sway * 0.004 * effort);
-  camera.position.y += 1.52;
-  lookTarget.copy(ahead.p).addScaledVector(ahead.r, LANE_OFFSET);
-  lookTarget.y += 0.3;
-  camera.lookAt(lookTarget);
-  camera.rotateZ(-state.lean);
+    const effort = Math.min(1, state.power / 300);
+    const sway = Math.sin(state.pedalPhase);
+    camera.position.copy(pose.p).addScaledVector(pose.r, LANE_OFFSET + sway * 0.004 * effort);
+    camera.position.y += 1.52;
+    lookTarget.copy(ahead.p).addScaledVector(ahead.r, LANE_OFFSET);
+    lookTarget.y += 0.3;
+    camera.lookAt(lookTarget);
+    camera.rotateZ(-state.lean);
 
-  const fov = 62 + Math.min(state.v, 20) * 0.75;
-  if (Math.abs(fov - camera.fov) > 0.01) {
-    camera.fov = fov;
-    camera.updateProjectionMatrix();
-  }
+    const fov = 62 + Math.min(state.v, 20) * 0.75;
+    if (Math.abs(fov - camera.fov) > 0.01) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
 
-  weather.stepWeather(dt, sceneryMode, world.terrainMat, world.roadMat);
-  weather.rainUniforms.uVel.value.copy(pose.t).multiplyScalar(state.v);
+    weather.stepWeather(dt, sceneryMode, world.terrainMat, world.roadMat);
+    weather.rainUniforms.uVel.value.copy(pose.t).multiplyScalar(state.v);
 
-  // Move shadow frustum with the rider
-  weather.sun.target.position.copy(pose.p).addScaledVector(pose.t, 70);
-  weather.sun.position.copy(weather.sun.target.position).addScaledVector(weather.sunDir, 350);
+    // Move shadow frustum with the rider
+    weather.sun.target.position.copy(pose.p).addScaledVector(pose.t, 70);
+    weather.sun.position.copy(weather.sun.target.position).addScaledVector(weather.sunDir, 350);
 
-  world.updateGrassChunks(camera.position);
+    world.updateGrassChunks(camera.position);
 
-  // Post-processing uniforms
-  sunNdc.copy(camera.position).addScaledVector(weather.sunDir, 1000).project(camera);
-  postfx.rays.uniforms.uSunUv.value.set(sunNdc.x * 0.5 + 0.5, sunNdc.y * 0.5 + 0.5);
-  const raysAmt =
-    0.25 * weather.current.rays * smoothstep(0.1, 0.6, camera.getWorldDirection(fwdDir).dot(weather.sunDir));
-  postfx.rays.uniforms.uAmt.value = raysAmt;
-  postfx.rays.enabled = raysAmt > 0.005;
-  postfx.lens.uniforms.uSpeed.value = Math.min(1, state.v / 22);
-  postfx.lens.uniforms.uTime.value = uniforms.uTime.value;
-  postfx.lens.uniforms.uRain.value = weather.current.rain;
-  postfx.lens.uniforms.uPaint.value = weather.current.paint;
+    // Post-processing uniforms
+    sunNdc.copy(camera.position).addScaledVector(weather.sunDir, 1000).project(camera);
+    postfx.rays.uniforms.uSunUv.value.set(sunNdc.x * 0.5 + 0.5, sunNdc.y * 0.5 + 0.5);
+    const raysAmt =
+      0.25 * weather.current.rays * smoothstep(0.1, 0.6, camera.getWorldDirection(fwdDir).dot(weather.sunDir));
+    postfx.rays.uniforms.uAmt.value = raysAmt;
+    postfx.rays.enabled = raysAmt > 0.005;
+    postfx.lens.uniforms.uSpeed.value = Math.min(1, state.v / 22);
+    postfx.lens.uniforms.uTime.value = uniforms.uTime.value;
+    postfx.lens.uniforms.uRain.value = weather.current.rain;
+    postfx.lens.uniforms.uPaint.value = weather.current.paint;
 
-  audio.update(state.v, weather.current.rain);
-  cockpit.spinWheel(state.v, dt);
+    audio.update(state.v, weather.current.rain);
+    cockpit.spinWheel(state.v, dt);
 
-  hudTimer -= dt;
-  if (hudTimer <= 0) {
-    hudTimer = 0.25;
-    cockpit.drawHeadUnit(state.v * 3.6, state.power, state.grade);
-    $('hud-power').textContent = state.power.toFixed(0);
-    $('hud-speed').textContent = (state.v * 3.6).toFixed(1);
-    $('hud-grade').textContent = `${state.grade >= 0 ? '+' : ''}${state.grade.toFixed(1)}`;
-    $('hud-dist').textContent = (state.distance / 1000).toFixed(2);
-  }
+    hudTimer -= dt;
+    if (hudTimer <= 0) {
+      hudTimer = 0.25;
+      cockpit.drawHeadUnit(state.v * 3.6, state.power, state.grade);
+      $('hud-power').textContent = state.power.toFixed(0);
+      $('hud-speed').textContent = (state.v * 3.6).toFixed(1);
+      $('hud-grade').textContent = `${state.grade >= 0 ? '+' : ''}${state.grade.toFixed(1)}`;
+      $('hud-dist').textContent = (state.distance / 1000).toFixed(2);
+    }
 
-  postfx.composer.render();
+    postfx.composer.render();
 
-  if (firstFrame) {
-    firstFrame = false;
-    const loading = $('loading');
-    if (loading) {
-      loading.style.opacity = '0';
-      setTimeout(() => loading.remove(), 900);
+    if (firstFrame) {
+      firstFrame = false;
+      hideLoading();
     }
   }
 

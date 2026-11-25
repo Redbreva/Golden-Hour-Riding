@@ -2,7 +2,7 @@
 
 export function initVoiceControl({
   button,
-  winterMode,
+  isWinterMode,
   setWeather,
   skipDistance,
   setCleanMode,
@@ -11,6 +11,7 @@ export function initVoiceControl({
   adjustHills,
   setHills,
   getHillsLabel,
+  onStatusChange,
 }) {
   const voiceApi = window.electronVoice;
   const commands = [
@@ -18,7 +19,7 @@ export function initVoiceControl({
     [/\b(harder|hard|heavier|more|tougher|gear up|shift up|change up|higher gear|up a gear)\b/, getHillsLabel, () => adjustHills(20)],
     [/\b(flat|flatter|no hills|hills off)\b/, getHillsLabel, () => setHills(0)],
     [/\b(full|real hills|all of it)\b/, getHillsLabel, () => setHills(100)],
-    ...(winterMode ? [[/\b(snow|snowing|snowy|christmas)\b/, 'Snow', () => setWeather('snow')]] : []),
+    [/\b(snow|snowing|snowy|christmas)\b/, 'Snow', () => { if (isWinterMode()) setWeather('snow'); }],
     [/\b(rain|reign|rayne|raining|rainy|storm|wet)\b/, 'Rain', () => setWeather('rain')],
     [/\b(mist|missed|misty|fog|foggy)\b/, 'Mist', () => setWeather('mist')],
     [/\b(overcast|over cast|cloud|clouds|cloudy|grey|gray)\b/, 'Overcast', () => setWeather('overcast')],
@@ -42,6 +43,7 @@ export function initVoiceControl({
   const setLabel = (text) => {
     button.textContent = text;
     button.classList.toggle('on', active);
+    if (onStatusChange) onStatusChange(active);
   };
 
   if (!voiceApi) {

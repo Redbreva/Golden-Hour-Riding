@@ -90,17 +90,36 @@ export function initRideLog({ panel, toggleBtn, courseId = 'valley', getDistance
     }
   }
 
-  toggleBtn.addEventListener('click', () => {
-    panel.hidden = !panel.hidden;
-    toggleBtn.classList.toggle('on', !panel.hidden);
-    if (!panel.hidden) render();
-  });
+  const detailsEl = toggleBtn.closest('details');
+  if (detailsEl) {
+    detailsEl.addEventListener('toggle', () => {
+      if (detailsEl.open) render();
+    });
+  } else {
+    toggleBtn.addEventListener('click', () => {
+      panel.hidden = !panel.hidden;
+      toggleBtn.classList.toggle('on', !panel.hidden);
+      if (!panel.hidden) render();
+    });
+  }
 
   setInterval(() => {
     save();
-    if (!panel.hidden) render();
+    if (detailsEl ? detailsEl.open : !panel.hidden) render();
   }, 5000);
 
   window.addEventListener('pagehide', save);
   document.addEventListener('visibilitychange', save);
+
+  function setCourse(newCourseId) {
+    save();
+    session.t = new Date().toISOString();
+    session.c = newCourseId;
+    session.m = 0;
+    session.s = 0;
+    lastTick = performance.now();
+    if (!panel.hidden) render();
+  }
+
+  return { setCourse, render };
 }
