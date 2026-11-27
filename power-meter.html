@@ -377,10 +377,11 @@
 
   <script>
     (() => {
-      const CYCLING_POWER_SERVICE = 0x1818;
-      const CYCLING_POWER_MEASUREMENT = 0x2a63;
-      const FTMS_SERVICE = 0x1826;
-      const FTMS_INDOOR_BIKE_DATA = 0x2ad2;
+      // Full 128-bit UUID strings for maximum compatibility with Bluefy (iPadOS) & Chrome/Edge
+      const CYCLING_POWER_SERVICE = '00001818-0000-1000-8000-00805f9b34fb';
+      const CYCLING_POWER_MEASUREMENT = '00002a63-0000-1000-8000-00805f9b34fb';
+      const FTMS_SERVICE = '00001826-0000-1000-8000-00805f9b34fb';
+      const FTMS_INDOOR_BIKE_DATA = '00002ad2-0000-1000-8000-00805f9b34fb';
 
       const $ = (id) => document.getElementById(id);
       const statusDot = $('status-dot');
@@ -589,31 +590,45 @@
       }
 
       async function subscribeToTrainer(dev) {
+        setUiState('', `Connecting GATT to ${dev.name || 'trainer'}…`);
         const server = await dev.gatt.connect();
-        let subscribed = false;
+        // Brief settle delay for iOS CoreBluetooth / Bluefy service discovery
+        await new Promise((r) => setTimeout(r, 350));
 
-        // Primary: standard Cycling Power Service (0x1818 / 0x2A63) — matches Golden Hour Riding
+        let subscribed = false;
+        let lastErr = null;
+
+        // Primary: standard Cycling Power Service (0x1818 / 0x2A63)
         try {
+          setUiState('', 'Discovering Cycling Power service…');
           const cpSvc = await server.getPrimaryService(CYCLING_POWER_SERVICE);
           const cpChar = await cpSvc.getCharacteristic(CYCLING_POWER_MEASUREMENT);
-          await cpChar.startNotifications();
           cpChar.addEventListener('characteristicvaluechanged', (e) => {
-            if (e.target.value.byteLength >= 4) {
+            if (e.target.value && e.target.value.byteLength >= 4) {
               recordPower(e.target.value.getInt16(2, true));
             }
           });
+          await cpChar.startNotifications();
           subscribed = true;
-        } catch {}
+        } catch (err) {
+          lastErr = err;
+        }
 
         // Fallback: FTMS Indoor Bike Data (0x1826 / 0x2AD2)
         if (!subscribed) {
-          const ftmsSvc = await server.getPrimaryService(FTMS_SERVICE);
-          const bikeChar = await ftmsSvc.getCharacteristic(FTMS_INDOOR_BIKE_DATA);
-          await bikeChar.startNotifications();
-          bikeChar.addEventListener('characteristicvaluechanged', (e) => {
-            const w = parseFtmsIndoorBikePower(e.target.value);
-            if (w !== null) recordPower(w);
-          });
+          try {
+            setUiState('', 'Trying FTMS Indoor Bike Data…');
+            const ftmsSvc = await server.getPrimaryService(FTMS_SERVICE);
+            const bikeChar = await ftmsSvc.getCharacteristic(FTMS_INDOOR_BIKE_DATA);
+            bikeChar.addEventListener('characteristicvaluechanged', (e) => {
+              const w = parseFtmsIndoorBikePower(e.target.value);
+              if (w !== null) recordPower(w);
+            });
+            await bikeChar.startNotifications();
+            subscribed = true;
+          } catch (err) {
+            throw lastErr || err;
+          }
         }
 
         setUiState('connected', `Connected to ${dev.name || 'Smart Trainer'}`);
