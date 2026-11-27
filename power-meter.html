@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Trainer Power Meter — Golden Hour Riding</title>
+  <style>
+    :root {
+      color-scheme: dark light;
+
+      --bg-dark: #0c0b0a;
+      --bg-light: #f4f1ec;
+      --surface-dark: #181614;
+      --surface-light: #ffffff;
+      --border-dark: rgba(255, 255, 255, 0.12);
+      --border-light: rgba(20, 16, 12, 0.12);
+      --text-dark: #f7f4ef;
+      --text-light: #191613;
+      --muted-dark: rgba(247, 244, 239, 0.62);
+      --muted-light: rgba(25, 22, 19, 0.62);
+      --accent-dark: #ffcf8f;
+      --accent-light: #b86200;
+      --accent-bg-dark: rgba(255, 207, 143, 0.14);
+      --accent-bg-light: rgba(184, 98, 0, 0.1);
+      --ok-dark: #6ee787;
+      --ok-light: #15803d;
+      --warn-dark: #ff8a80;
+      --warn-light: #b91c1c;
+
+      --bg: var(--bg-dark);
+      --surface: var(--surface-dark);
+      --border: var(--border-dark);
+      --text: var(--text-dark);
+      --muted: var(--muted-dark);
+      --accent: var(--accent-dark);
+      --accent-bg: var(--accent-bg-dark);
+      --ok: var(--ok-dark);
+      --warn: var(--warn-dark);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: var(--bg-light);
+        --surface: var(--surface-light);
+        --border: var(--border-light);
+        --text: var(--text-light);
+        --muted: var(--muted-light);
+        --accent: var(--accent-light);
+        --accent-bg: var(--accent-bg-light);
+        --ok: var(--ok-light);
+        --warn: var(--warn-light);
+      }
+    }
+
+    @supports (color: light-dark(white, black)) {
+      :root {
+        --bg: light-dark(var(--bg-light), var(--bg-dark));
+        --surface: light-dark(var(--surface-light), var(--surface-dark));
+        --border: light-dark(var(--border-light), var(--border-dark));
+        --text: light-dark(var(--text-light), var(--text-dark));
+        --muted: light-dark(var(--muted-light), var(--muted-dark));
+        --accent: light-dark(var(--accent-light), var(--accent-dark));
+        --accent-bg: light-dark(var(--accent-bg-light), var(--accent-bg-dark));
+        --ok: light-dark(var(--ok-light), var(--ok-dark));
+        --warn: light-dark(var(--warn-light), var(--warn-dark));
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100dvh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right))
+        max(16px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+      gap: 16px;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .dot.connected {
+      background: var(--ok);
+      box-shadow: 0 0 10px var(--ok);
+    }
+
+    .dot.demo {
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(18px, 2.4vw, 24px);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .status-text {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      font: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      padding: 12px 20px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.primary {
+      background: var(--accent-bg);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    button.connected {
+      border-color: var(--ok);
+      color: var(--ok);
+    }
+
+    .banner {
+      padding: 12px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--warn);
+      background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .banner[hidden] {
+      display: none;
+    }
+
+    .grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: clamp(18px, 3vw, 30px);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 180px;
+    }
+
+    .card.hero {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .label {
+      font-size: clamp(13px, 1.8vw, 17px);
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .card.hero .label {
+      color: var(--accent);
+    }
+
+    .unit {
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .value {
+      font-size: clamp(64px, 13vw, 148px);
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      margin: 8px 0 4px;
+    }
+
+    .sub {
+      font-size: 13px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 14px 18px;
+    }
+
+    .chart-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 14px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 3px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
+    canvas#spark {
+      display: block;
+      width: 100%;
+      height: 96px;
+    }
+
+    @media (max-width: 640px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      .card {
+        min-height: 130px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="brand">
+        <span id="status-dot" class="dot" aria-hidden="true"></span>
+        <h1>Trainer Power Meter</h1>
+      </div>
+      <div id="status-text" class="status-text">Not connected</div>
+    </div>
+    <div class="actions">
+      <button id="btn-connect" type="button" class="primary">Connect Trainer</button>
+      <button id="btn-demo" type="button">Demo Mode</button>
+      <button id="btn-reset" type="button">Reset Peaks</button>
+    </div>
+  </header>
+
+  <div id="ble-banner" class="banner" hidden>
+    <strong>Web Bluetooth is not available in this browser.</strong><br />
+    Safari on iPadOS does not support Web Bluetooth. Open this page in
+    <strong>Bluefy – Web BLE Browser</strong> (free on the App Store) on your iPad, or in Chrome/Edge on Mac, Windows, or Android.
+    You can still tap <strong>Demo Mode</strong> to preview the display.
+  </div>
+
+  <main class="grid" aria-live="polite">
+    <section class="card hero">
+      <div class="card-head">
+        <span class="label">Instant Power</span>
+        <span class="unit">Watts</span>
+      </div>
+      <div id="val-inst" class="value">--</div>
+      <div id="sub-inst" class="sub">Peak: -- W</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="label">3s Average</span>
+        <span class="unit">Watts</span>
+      </div>
+      <div id="val-3s" class="value">--</div>
+      <div id="sub-3s" class="sub">Peak 3s: -- W</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="label">5s Average</span>
+        <span class="unit">Watts</span>
+      </div>
+      <div id="val-5s" class="value">--</div>
+      <div id="sub-5s" class="sub">Peak 5s: -- W</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <span class="label">10s Average</span>
+        <span class="unit">Watts</span>
+      </div>
+      <div id="val-10s" class="value">--</div>
+      <div id="sub-10s" class="sub">Peak 10s: -- W</div>
+    </section>
+  </main>
+
+  <section class="chart-card" aria-label="60-second power history">
+    <div class="chart-head">
+      <span>Last 60 Seconds</span>
+      <div class="legend">
+        <span><i class="swatch" style="background: rgba(160, 160, 160, 0.65)"></i>Instant</span>
+        <span><i class="swatch" style="background: var(--accent)"></i>10s Avg</span>
+      </div>
+    </div>
+    <canvas id="spark"></canvas>
+  </section>
+
+  <script>
+    (() => {
+      const CYCLING_POWER_SERVICE = 0x1818;
+      const CYCLING_POWER_MEASUREMENT = 0x2a63;
+      const FTMS_SERVICE = 0x1826;
+      const FTMS_INDOOR_BIKE_DATA = 0x2ad2;
+
+      const $ = (id) => document.getElementById(id);
+      const statusDot = $('status-dot');
+      const statusText = $('status-text');
+      const btnConnect = $('btn-connect');
+      const btnDemo = $('btn-demo');
+      const btnReset = $('btn-reset');
+      const bleBanner = $('ble-banner');
+      const sparkCanvas = $('spark');
+      const sparkCtx = sparkCanvas.getContext('2d');
+
+      const valEls = {
+        inst: $('val-inst'),
+        s3: $('val-3s'),
+        s5: $('val-5s'),
+        s10: $('val-10s'),
+      };
+      const subEls = {
+        inst: $('sub-inst'),
+        s3: $('sub-3s'),
+        s5: $('sub-5s'),
+        s10: $('sub-10s'),
+      };
+
+      if (!navigator.bluetooth) {
+        bleBanner.hidden = false;
+      }
+
+      // Rolling sample buffer (keeps last 60s for sparkline & exact 3s/5s/10s moving averages)
+      const samples = []; // { t: ms, w: watts, avg10: watts }
+      let latestWatts = null;
+      let latestAt = 0;
+      let peaks = { inst: 0, s3: 0, s5: 0, s10: 0 };
+
+      let device = null;
+      let reconnecting = false;
+      let demoTimer = null;
+      let demoPhase = 0;
+      let wakeLock = null;
+
+      async function requestWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+        } catch {}
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && (device || demoTimer)) {
+          requestWakeLock();
+        }
+      });
+
+      function windowAverage(now, windowMs) {
+        const cutoff = now - windowMs;
+        let sum = 0;
+        let count = 0;
+        for (let i = samples.length - 1; i >= 0; i--) {
+          if (samples[i].t < cutoff) break;
+          sum += samples[i].w;
+          count++;
+        }
+        return count > 0 ? Math.round(sum / count) : null;
+      }
+
+      function recordPower(watts) {
+        const w = Math.max(0, Math.round(watts));
+        const now = performance.now();
+        latestWatts = w;
+        latestAt = now;
+        samples.push({ t: now, w, avg10: w });
+        const avg10 = windowAverage(now, 10000);
+        samples[samples.length - 1].avg10 = avg10 ?? w;
+
+        // Prune older than 65s
+        const pruneCutoff = now - 65000;
+        while (samples.length && samples[0].t < pruneCutoff) {
+          samples.shift();
+        }
+        renderMetrics(now);
+      }
+
+      function renderMetrics(now = performance.now()) {
+        // If connected/demo but silent for > 3s, treat as 0 W so moving averages decay cleanly
+        if ((device || demoTimer) && latestAt > 0 && now - latestAt > 3000) {
+          latestWatts = 0;
+        }
+
+        const inst = latestWatts;
+        const s3 = windowAverage(now, 3000);
+        const s5 = windowAverage(now, 5000);
+        const s10 = windowAverage(now, 10000);
+
+        if (inst !== null && inst > peaks.inst) peaks.inst = inst;
+        if (s3 !== null && s3 > peaks.s3) peaks.s3 = s3;
+        if (s5 !== null && s5 > peaks.s5) peaks.s5 = s5;
+        if (s10 !== null && s10 > peaks.s10) peaks.s10 = s10;
+
+        valEls.inst.textContent = inst !== null ? inst : '--';
+        valEls.s3.textContent = s3 !== null ? s3 : '--';
+        valEls.s5.textContent = s5 !== null ? s5 : '--';
+        valEls.s10.textContent = s10 !== null ? s10 : '--';
+
+        subEls.inst.textContent = `Peak: ${peaks.inst ? peaks.inst + ' W' : '-- W'}`;
+        subEls.s3.textContent = `Peak 3s: ${peaks.s3 ? peaks.s3 + ' W' : '-- W'}`;
+        subEls.s5.textContent = `Peak 5s: ${peaks.s5 ? peaks.s5 + ' W' : '-- W'}`;
+        subEls.s10.textContent = `Peak 10s: ${peaks.s10 ? peaks.s10 + ' W' : '-- W'}`;
+
+        drawSparkline(now);
+      }
+
+      function drawSparkline(now) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const cssW = sparkCanvas.clientWidth || 600;
+        const cssH = sparkCanvas.clientHeight || 96;
+        if (sparkCanvas.width !== Math.round(cssW * dpr) || sparkCanvas.height !== Math.round(cssH * dpr)) {
+          sparkCanvas.width = Math.round(cssW * dpr);
+          sparkCanvas.height = Math.round(cssH * dpr);
+        }
+
+        sparkCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        sparkCtx.clearRect(0, 0, cssW, cssH);
+
+        const cutoff = now - 60000;
+        let maxW = 250;
+        for (let i = samples.length - 1; i >= 0; i--) {
+          if (samples[i].t < cutoff) break;
+          if (samples[i].w > maxW) maxW = samples[i].w;
+        }
+        maxW = Math.ceil(maxW / 50) * 50;
+
+        const styles = getComputedStyle(document.documentElement);
+        const accentCol = styles.getPropertyValue('--accent').trim() || '#ffcf8f';
+        const borderCol = styles.getPropertyValue('--border').trim() || 'rgba(255,255,255,0.12)';
+        const mutedCol = styles.getPropertyValue('--muted').trim() || 'rgba(255,255,255,0.5)';
+
+        // Horizontal guide lines
+        sparkCtx.strokeStyle = borderCol;
+        sparkCtx.lineWidth = 1;
+        sparkCtx.beginPath();
+        sparkCtx.moveTo(0, cssH * 0.5);
+        sparkCtx.lineTo(cssW, cssH * 0.5);
+        sparkCtx.moveTo(0, cssH - 1);
+        sparkCtx.lineTo(cssW, cssH - 1);
+        sparkCtx.stroke();
+
+        // Scale label
+        sparkCtx.fillStyle = mutedCol;
+        sparkCtx.font = '500 11px -apple-system, BlinkMacSystemFont, sans-serif';
+        sparkCtx.fillText(`${maxW} W`, 4, 12);
+
+        const xOf = (t) => ((t - cutoff) / 60000) * cssW;
+        const yOf = (w) => cssH - 6 - (Math.min(maxW, w) / maxW) * (cssH - 14);
+
+        // Instant power line
+        sparkCtx.strokeStyle = 'rgba(160, 160, 160, 0.55)';
+        sparkCtx.lineWidth = 1.5;
+        sparkCtx.beginPath();
+        let started = false;
+        for (let i = 0; i < samples.length; i++) {
+          if (samples[i].t < cutoff) continue;
+          const x = xOf(samples[i].t);
+          const y = yOf(samples[i].w);
+          if (!started) { sparkCtx.moveTo(x, y); started = true; }
+          else sparkCtx.lineTo(x, y);
+        }
+        sparkCtx.stroke();
+
+        // 10s moving average line
+        sparkCtx.strokeStyle = accentCol;
+        sparkCtx.lineWidth = 2.5;
+        sparkCtx.beginPath();
+        started = false;
+        for (let i = 0; i < samples.length; i++) {
+          if (samples[i].t < cutoff) continue;
+          const x = xOf(samples[i].t);
+          const y = yOf(samples[i].avg10);
+          if (!started) { sparkCtx.moveTo(x, y); started = true; }
+          else sparkCtx.lineTo(x, y);
+        }
+        sparkCtx.stroke();
+      }
+
+      // Parse FTMS Indoor Bike Data (0x2AD2) Instantaneous Power fallback when Cycling Power (0x1818) isn't exposed
+      function parseFtmsIndoorBikePower(dv) {
+        if (dv.byteLength < 4) return null;
+        const flags = dv.getUint16(0, true);
+        let offset = 2;
+        if ((flags & 0x0001) === 0) offset += 2; // Instantaneous Speed present when bit 0 == 0
+        if (flags & 0x0002) offset += 2; // Average Speed
+        if (flags & 0x0004) offset += 2; // Instantaneous Cadence
+        if (flags & 0x0008) offset += 2; // Average Cadence
+        if (flags & 0x0010) offset += 3; // Total Distance
+        if (flags & 0x0020) offset += 2; // Resistance Level
+        if (flags & 0x0040) {
+          if (offset + 2 <= dv.byteLength) return dv.getInt16(offset, true);
+        }
+        return null;
+      }
+
+      function setUiState(mode, text) {
+        statusDot.className = 'dot' + (mode ? ' ' + mode : '');
+        statusText.textContent = text;
+        btnConnect.classList.toggle('connected', mode === 'connected');
+        btnConnect.textContent = mode === 'connected' ? 'Disconnect' : 'Connect Trainer';
+      }
+
+      async function subscribeToTrainer(dev) {
+        const server = await dev.gatt.connect();
+        let subscribed = false;
+
+        // Primary: standard Cycling Power Service (0x1818 / 0x2A63) — matches Golden Hour Riding
+        try {
+          const cpSvc = await server.getPrimaryService(CYCLING_POWER_SERVICE);
+          const cpChar = await cpSvc.getCharacteristic(CYCLING_POWER_MEASUREMENT);
+          await cpChar.startNotifications();
+          cpChar.addEventListener('characteristicvaluechanged', (e) => {
+            if (e.target.value.byteLength >= 4) {
+              recordPower(e.target.value.getInt16(2, true));
+            }
+          });
+          subscribed = true;
+        } catch {}
+
+        // Fallback: FTMS Indoor Bike Data (0x1826 / 0x2AD2)
+        if (!subscribed) {
+          const ftmsSvc = await server.getPrimaryService(FTMS_SERVICE);
+          const bikeChar = await ftmsSvc.getCharacteristic(FTMS_INDOOR_BIKE_DATA);
+          await bikeChar.startNotifications();
+          bikeChar.addEventListener('characteristicvaluechanged', (e) => {
+            const w = parseFtmsIndoorBikePower(e.target.value);
+            if (w !== null) recordPower(w);
+          });
+        }
+
+        setUiState('connected', `Connected to ${dev.name || 'Smart Trainer'}`);
+        requestWakeLock();
+      }
+
+      async function handleDisconnect() {
+        if (!device || reconnecting) return;
+        reconnecting = true;
+        const target = device;
+        setUiState('', `Connection lost — reconnecting to ${target.name || 'trainer'}…`);
+        for (let attempt = 1; attempt <= 5; attempt++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          if (device !== target) break;
+          try {
+            await subscribeToTrainer(target);
+            reconnecting = false;
+            return;
+          } catch {}
+        }
+        reconnecting = false;
+        if (device === target) {
+          device = null;
+          setUiState('', 'Disconnected');
+        }
+      }
+
+      function stopDemo() {
+        if (demoTimer) {
+          clearInterval(demoTimer);
+          demoTimer = null;
+          btnDemo.textContent = 'Demo Mode';
+        }
+      }
+
+      btnConnect.addEventListener('click', async () => {
+        if (device) {
+          const old = device;
+          device = null;
+          try { old.gatt.disconnect(); } catch {}
+          setUiState('', 'Disconnected');
+          return;
+        }
+        if (!navigator.bluetooth) {
+          bleBanner.hidden = false;
+          return;
+        }
+        stopDemo();
+        setUiState('', 'Scanning for Bluetooth trainers…');
+        try {
+          const dev = await navigator.bluetooth.requestDevice({
+            filters: [{ services: [CYCLING_POWER_SERVICE] }, { services: [FTMS_SERVICE] }],
+            optionalServices: [CYCLING_POWER_SERVICE, FTMS_SERVICE],
+          });
+          device = dev;
+          dev.addEventListener('gattserverdisconnected', handleDisconnect);
+          setUiState('', `Connecting to ${dev.name || 'trainer'}…`);
+          await subscribeToTrainer(dev);
+        } catch (err) {
+          device = null;
+          setUiState('', err && err.name === 'NotFoundError' ? 'Scan cancelled' : `Error: ${err.message || err}`);
+        }
+      });
+
+      btnDemo.addEventListener('click', () => {
+        if (demoTimer) {
+          stopDemo();
+          if (!device) setUiState('', 'Not connected');
+          return;
+        }
+        if (device) {
+          const old = device;
+          device = null;
+          try { old.gatt.disconnect(); } catch {}
+        }
+        btnDemo.textContent = 'Stop Demo';
+        setUiState('demo', 'Demo Mode — simulated 1 Hz power');
+        requestWakeLock();
+        demoTimer = setInterval(() => {
+          demoPhase += 0.22;
+          const base = 215 + Math.sin(demoPhase * 0.4) * 55 + Math.sin(demoPhase * 1.3) * 20;
+          const noise = (Math.random() - 0.5) * 28;
+          recordPower(base + noise);
+        }, 500);
+      });
+
+      btnReset.addEventListener('click', () => {
+        peaks = { inst: 0, s3: 0, s5: 0, s10: 0 };
+        samples.length = 0;
+        renderMetrics();
+      });
+
+      // Periodic tick keeps moving averages & sparkline smooth even between BLE packets
+      setInterval(() => {
+        if (samples.length || device || demoTimer) renderMetrics();
+      }, 250);
+
+      window.addEventListener('resize', () => drawSparkline(performance.now()));
+      renderMetrics();
+    })();
+  </script>
+</body>
+</html>
